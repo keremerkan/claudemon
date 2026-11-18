@@ -220,22 +220,14 @@ struct UsageFetcher {
             let outHandle = stdoutPipe.fileHandleForReading
             let errHandle = stderrPipe.fileHandleForReading
 
-            outHandle.readabilityHandler = { handle in
-                let chunk = handle.availableData
-                if chunk.isEmpty {
-                    handle.readabilityHandler = nil // EOF
-                } else {
-                    outBuffer.append(chunk)
-                }
-            }
-            errHandle.readabilityHandler = { handle in
-                let chunk = handle.availableData
-                if chunk.isEmpty {
-                    handle.readabilityHandler = nil // EOF
-                } else {
-                    errBuffer.append(chunk)
-                }
-            }
+            // Finish only once the process has exited AND both pipes hit EOF.
+            // No blocking read after exit: if a grandchild keeps a pipe open,
+            // the result waits and the timeout below can still fire, instead
+            // of the fetch (and all later polls) hanging forever.
+            let finished = DispatchGroup()
+            finished.enter() // process exit
+            drain(outHandle, into: outBuffer, group: finished)
+            drain(errHandle, into: errBuffer, group: finished)
 
             // Timeout watchdog.
             let timeoutWork = DispatchWorkItem {
@@ -251,28 +243,24 @@ struct UsageFetcher {
             }
             DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: timeoutWork)
 
-            process.terminationHandler = { proc in
+            process.terminationHandler = { _ in finished.leave() }
+
+            finished.notify(queue: .global()) {
                 timeoutWork.cancel()
                 guard resumed.tryResume() else { return }
 
-                // Detach handlers and capture whatever the loops accumulated,
-                // plus any trailing bytes still in the pipe at exit.
-                outHandle.readabilityHandler = nil
-                errHandle.readabilityHandler = nil
-                outBuffer.append(outHandle.readDataToEndOfFile())
-                errBuffer.append(errHandle.readDataToEndOfFile())
-
                 let outData = outBuffer.data
                 let errData = errBuffer.data
+                let status = process.terminationStatus
 
-                if proc.terminationStatus != 0 {
+                if status != 0 {
                     let stderr = String(decoding: errData, as: UTF8.self)
-                    fetchLog.error("claude exited non-zero (\(proc.terminationStatus, privacy: .public))")
+                    fetchLog.error("claude exited non-zero (\(status, privacy: .public))")
                     if UsageFetchError.looksLikeAuthFailure(stderr: stderr) {
                         continuation.resume(throwing: UsageFetchError.notSignedIn)
                     } else {
                         continuation.resume(throwing: UsageFetchError.nonZeroExit(
-                            code: proc.terminationStatus, stderr: stderr))
+                            code: status, stderr: stderr))
                     }
                     return
                 }
@@ -300,6 +288,20 @@ struct UsageFetcher {
                     invalidateCache()
                     continuation.resume(throwing: UsageFetchError.launchFailed(error.localizedDescription))
                 }
+            }
+        }
+    }
+
+    /// Accumulate a pipe's output as it arrives; leave `group` once at EOF.
+    private static func drain(_ handle: FileHandle, into buffer: DataBuffer, group: DispatchGroup) {
+        group.enter()
+        handle.readabilityHandler = { handle in
+            let chunk = handle.availableData
+            if chunk.isEmpty {
+                handle.readabilityHandler = nil
+                group.leave()
+            } else {
+                buffer.append(chunk)
             }
         }
     }

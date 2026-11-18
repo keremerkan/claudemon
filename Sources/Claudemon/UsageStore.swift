@@ -469,9 +469,11 @@ final class UsageStore: ObservableObject {
         return text
     }
 
-    /// Session percent for the compact menu-bar label, if available.
+    /// Session percent for the compact menu-bar label, or nil with no data.
+    /// The CLI omits the session line while no 5-hour window is active, so a
+    /// report without one means 0% (matching the floating window and widget).
     var sessionPercent: Int? {
-        lastGoodReport?.session?.percent
+        lastGoodReport.map { $0.session?.percent ?? 0 }
     }
 
     /// The weekly metric the menu-bar bar graph's second bar tracks, per the

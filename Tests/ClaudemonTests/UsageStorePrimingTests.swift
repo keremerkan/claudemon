@@ -141,4 +141,22 @@ final class UsageStorePrimingTests: XCTestCase {
         // The stale-render branch keeps last-good iff lastGoodReport != nil.
         XCTAssertNotNil(store.lastGoodReport, "Primed last-good guards against a drop to .loading")
     }
+
+    /// The CLI omits the session line while no 5-hour window is active. A
+    /// report with only weekly limits must still drive the menu bar, with the
+    /// session at 0% (as the floating window and widget already show it).
+    func testMissingSessionLineReadsAsZeroPercent() {
+        let weekAll = UsageMetric(
+            kind: .weekAll, rawLabel: "Current week (all models)", percent: 31,
+            resetDate: date(2026, 11, 19, 8, 59), timezoneIdentifier: "Europe/Istanbul"
+        )
+        let report = UsageReport(metrics: [weekAll], capturedAt: date(2026, 11, 18, 10, 0))
+        let cache = SharedUsageCache(baseDirectory: tempDir)
+        cache.write(CachedUsage(report: report, state: .ok, errorMessage: nil, writtenAt: report.capturedAt))
+
+        let store = UsageStore(cache: cache)
+        XCTAssertNil(store.sessionPercent, "No data yet: no percent")
+        store.primeFromCache()
+        XCTAssertEqual(store.sessionPercent, 0)
+    }
 }

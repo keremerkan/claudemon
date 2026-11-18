@@ -94,6 +94,10 @@ final class NotificationManager: ObservableObject {
     /// `UsageAlertPolicy.ResetWindowState`.
     private var resetState: [String: UsageAlertPolicy.ResetWindowState] = [:]
 
+    /// Last display label seen per metric, so a reset banner for a limit that
+    /// has dropped out of the report still names the right model.
+    private var resetLabels: [String: String] = [:]
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.isEnabled = defaults.bool(forKey: Self.masterDefaultsKey)
@@ -172,8 +176,25 @@ final class NotificationManager: ObservableObject {
                 prior: resetState[key] ?? .init()
             )
             resetState[key] = resetDecision.state
+            resetLabels[key] = metric.displayLabel
             if resetAlertsEnabled, resetDecision.fireReset {
-                postReset(metric: metric)
+                postReset(label: metric.displayLabel, kind: metric.kind)
+            }
+        }
+
+        // A limit whose window ended can drop out of the report entirely (the
+        // CLI omits the session line until a new 5-hour window starts). Still
+        // check its pending reset so the alert fires when the window rolls
+        // over, not when the user next starts a session.
+        let reported = Set(report.metrics.map(\.kind))
+        for kind in UsageMetric.Kind.allCases where !reported.contains(kind) {
+            let key = kind.rawValue
+            guard let prior = resetState[key] else { continue }
+            let resetDecision = UsageAlertPolicy.decideReset(
+                now: report.capturedAt, resetDate: nil, percentUsed: 0, prior: prior)
+            resetState[key] = resetDecision.state
+            if resetAlertsEnabled, resetDecision.fireReset {
+                postReset(label: resetLabels[key] ?? kind.displayName, kind: kind)
             }
         }
 
@@ -201,15 +222,15 @@ final class NotificationManager: ObservableObject {
         center.add(request, withCompletionHandler: nil)
     }
 
-    private func postReset(metric: UsageMetric) {
+    private func postReset(label: String, kind: UsageMetric.Kind) {
         let content = UNMutableNotificationContent()
         content.title = "Claudemon"
-        content.subtitle = metric.displayLabel
+        content.subtitle = label
         content.body = resetAlertBodyText
         content.sound = .default
 
         // Unique id per fire so banners stack rather than coalesce.
-        let id = "claudemon.reset.\(metric.kind.rawValue).\(UUID().uuidString)"
+        let id = "claudemon.reset.\(kind.rawValue).\(UUID().uuidString)"
         let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
         center.add(request, withCompletionHandler: nil)
     }

@@ -84,8 +84,11 @@ public enum UsageParser {
 
     private static func classify(line: String) -> UsageMetric.Kind? {
         let lower = line.lowercased()
-        // Must look like a usage line at all.
-        guard lower.contains("used") || lower.contains("resets") else { return nil }
+        // Limit lines always start with "Current". Anchoring on it keeps the
+        // CLI's "What's contributing to your usage?" tips (percent-led lines
+        // that can mention sessions) from being read as limits.
+        guard lower.hasPrefix("current "),
+              lower.contains("used") || lower.contains("resets") else { return nil }
 
         if lower.contains("session") {
             return .session

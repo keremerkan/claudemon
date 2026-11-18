@@ -298,4 +298,29 @@ final class UsageParserTests: XCTestCase {
         XCTAssertEqual(report.metrics.map { $0.kind }, [.session, .weekAll, .weekModel],
                        "Output ordering must be stable regardless of input order")
     }
+
+    /// The CLI now appends a "What's contributing to your usage?" section of
+    /// percent-led tips. Only "Current …" lines are limits; a tip mentioning
+    /// sessions must not become a bogus session metric. Shape copied from a
+    /// real 2026-11 body, which also omits the session line (no active window).
+    func testContributionTipsAreNotParsedAsLimits() throws {
+        let text = """
+        You are currently using your subscription to power your Claude Code usage
+
+        Current week (all models): 31% used · resets Nov 19 at 8:59am (Europe/Istanbul)
+        Current week (Fable): 53% used · resets Nov 19 at 8:59am (Europe/Istanbul)
+
+        What's contributing to your usage?
+        Approximate · sessions on this machine only · shares overlap
+
+        Last 7d · 2887 requests · 3 sessions
+          100%  Review sessions active over many hours · whole sessions with requests in 8 or more separate hours
+          40%  Sessions that used subagents · resets context less often
+        """
+        let report = try UsageParser.parse(resultText: text, now: Date(timeIntervalSince1970: 1_795_000_000))
+        XCTAssertNil(report.session, "A tip line must not be read as the session limit")
+        XCTAssertEqual(report.weekAll?.percent, 31)
+        XCTAssertEqual(report.weekModel?.percent, 53)
+        XCTAssertEqual(report.metrics.count, 2)
+    }
 }
