@@ -36,8 +36,9 @@ final class ClaudemonAppState {
     private init() {}
 }
 
-/// Compact menu-bar label: gauge SF Symbol + live session percent, or a
-/// rasterized bar graph in the `.bars` display mode.
+/// Compact menu-bar label: gauge SF Symbol + the primary limit's percent (the
+/// session, or the all-models week without a session limit), or a rasterized
+/// bar graph in the `.bars` display mode.
 struct MenuBarLabel: View {
     @ObservedObject var store: UsageStore
 
@@ -59,7 +60,7 @@ struct MenuBarLabel: View {
     /// mode entirely so the item is never empty and stays clickable.
     @ViewBuilder
     private var content: some View {
-        if let percent = store.sessionPercent {
+        if let percent = store.primaryMetric?.percent {
             modeContent(percent: percent)
         } else if store.isNotInstalled || store.isNotSignedIn {
             // Calm onboarding hint, not a scary error — a neutral dash.
@@ -83,7 +84,7 @@ struct MenuBarLabel: View {
         case .iconOnly:
             Image(systemName: gaugeSymbol)
         case .bars:
-            if let image = barsImage(sessionPercent: percent) {
+            if let image = barsImage(primaryPercent: percent) {
                 Image(nsImage: image)
             } else {
                 // Rasterization failed (shouldn't happen): fall back to text
@@ -98,9 +99,9 @@ struct MenuBarLabel: View {
     /// SwiftUI label views. Re-evaluated whenever the store publishes or the
     /// menu-bar appearance/scale changes; the view is tiny, so rendering is
     /// cheap at the 60s poll cadence.
-    private func barsImage(sessionPercent: Int) -> NSImage? {
+    private func barsImage(primaryPercent: Int) -> NSImage? {
         let config = MenuBarBarsView.Configuration(
-            sessionPercent: sessionPercent,
+            primaryPercent: primaryPercent,
             weekPercent: store.menuBarShowsWeekBar ? store.menuBarWeekMetric?.percent : nil,
             showsPercent: store.menuBarShowsPercent,
             isVertical: store.menuBarBarsVertical,
@@ -124,10 +125,11 @@ struct MenuBarLabel: View {
             .monospacedDigit()
     }
 
-    /// Pick a gauge glyph roughly reflecting the session fill level. When Claude
-    /// Code isn't installed / signed in, show a neutral empty gauge (no alarm).
+    /// Pick a gauge glyph roughly reflecting the primary limit's fill level.
+    /// When Claude Code isn't installed / signed in, show a neutral empty gauge
+    /// (no alarm).
     private var gaugeSymbol: String {
-        guard let p = store.sessionPercent else { return "gauge.with.dots.needle.0percent" }
+        guard let p = store.primaryMetric?.percent else { return "gauge.with.dots.needle.0percent" }
         switch p {
         case ..<34: return "gauge.with.dots.needle.0percent"
         case 34..<67: return "gauge.with.dots.needle.50percent"
@@ -136,17 +138,26 @@ struct MenuBarLabel: View {
     }
 
     private var accessibilityLabel: String {
-        if let p = store.sessionPercent {
+        if let primary = store.primaryMetric {
+            let summary = "Claudemon, \(spokenName(primary)) \(primary.percent) percent"
             if store.menuBarDisplayMode == .bars, store.menuBarShowsWeekBar,
                let week = store.menuBarWeekMetric {
-                let name = week.kind == .weekModel ? "\(week.modelName) week" : "week"
-                return "Claudemon, session \(p) percent, \(name) \(week.percent) percent used"
+                return "\(summary), \(spokenName(week)) \(week.percent) percent used"
             }
-            return "Claudemon, session \(p) percent used"
+            return "\(summary) used"
         }
         if store.isNotInstalled { return "Claudemon, Claude Code isn't installed" }
         if store.isNotSignedIn { return "Claudemon, sign in to Claude Code" }
         return store.errorMessage ?? "Claudemon, loading usage"
+    }
+
+    /// "session", "week", or "Fable week" for VoiceOver.
+    private func spokenName(_ metric: UsageMetric) -> String {
+        switch metric.kind {
+        case .session: return "session"
+        case .weekAll: return "week"
+        case .weekModel: return "\(metric.shortLabel) week"
+        }
     }
 }
 

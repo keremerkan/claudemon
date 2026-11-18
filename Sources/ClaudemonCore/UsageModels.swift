@@ -10,7 +10,7 @@ public struct UsageMetric: Identifiable, Equatable, Codable, Sendable {
         case weekAll
         /// The per-model weekly limit. Which model this tracks (Sonnet, Fable,
         /// ...) is decided by Anthropic and shows up only in `rawLabel` — see
-        /// `UsageMetric.modelName`. Do not hardcode a model name here.
+        /// `UsageMetric.shortLabel`. Do not hardcode a model name here.
         case weekModel
 
         public var displayName: String {
@@ -53,11 +53,11 @@ public struct UsageMetric: Identifiable, Equatable, Codable, Sendable {
         return TimeZone(identifier: timezoneIdentifier)
     }
 
-    /// Best-effort model name for a `.weekModel` metric, extracted from the
-    /// parenthesized part of `rawLabel` (e.g. "Current week (Fable)" →
-    /// "Fable"). Falls back to the kind's generic short name if the label
-    /// doesn't have the expected shape.
-    public var modelName: String {
+    /// Compact label: "Session", "Week", or for a `.weekModel` metric the
+    /// model name extracted from the parenthesized part of `rawLabel` (e.g.
+    /// "Current week (Fable)" → "Fable"). A `.weekModel` label without the
+    /// expected shape falls back to the kind's generic short name.
+    public var shortLabel: String {
         guard kind == .weekModel,
               let open = rawLabel.firstIndex(of: "("),
               let close = rawLabel.firstIndex(of: ")"), open < close else {
@@ -77,7 +77,7 @@ public struct UsageMetric: Identifiable, Equatable, Codable, Sendable {
     /// currently naming there.
     public var displayLabel: String {
         guard kind == .weekModel else { return kind.displayName }
-        return "Current Week (\(modelName))"
+        return "Current Week (\(shortLabel))"
     }
 }
 
@@ -99,6 +99,17 @@ public struct UsageReport: Equatable, Codable, Sendable {
     public var session: UsageMetric? { metric(.session) }
     public var weekAll: UsageMetric? { metric(.weekAll) }
     public var weekModel: UsageMetric? { metric(.weekModel) }
+
+    /// The headline limit for the menu bar and rings: the 5-hour session, or
+    /// the all-models week for accounts without a session limit (Max plans,
+    /// for which the CLI prints no session line).
+    public var primary: UsageMetric? { session ?? weekAll }
+
+    /// The weekly limits other than `primary`, in report order: both weeks
+    /// with a session limit, only the per-model week without one.
+    public var secondary: [UsageMetric] {
+        metrics.filter { $0.kind != .session && $0.kind != primary?.kind }
+    }
 }
 
 // MARK: - Formatting helpers
@@ -125,20 +136,18 @@ public enum UsageFormatting {
     /// Absolute reset time formatted in the metric's own timezone, e.g.
     /// "Jun 24, 2:49 AM".
     public static func absoluteResetString(date: Date?, timezone: TimeZone?) -> String? {
-        guard let date else { return nil }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US")
-        formatter.timeZone = timezone ?? TimeZone.current
-        formatter.dateFormat = "MMM d, h:mm a"
-        return formatter.string(from: date)
+        date.map { format($0, "MMM d, h:mm a", timeZone: timezone) }
     }
 
     /// "HH:mm:ss" wall-clock string (local timezone) used for "last updated".
     public static func clockString(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US")
-        formatter.dateFormat = "HH:mm:ss"
-        return formatter.string(from: date)
+        format(date, "HH:mm:ss", timeZone: nil)
+    }
+
+    /// "MMM d" date (e.g. "Nov 19") in the supplied timezone, used for weekly
+    /// reset hints where a clock time alone would be ambiguous.
+    public static func shortDateString(_ date: Date, timeZone: TimeZone?) -> String {
+        format(date, "MMM d", timeZone: timeZone)
     }
 
     /// "HH:mm" wall-clock string (local timezone) used for the widget's
@@ -151,10 +160,14 @@ public enum UsageFormatting {
     /// current timezone when nil). Used for the widget's "resets at" suffix so
     /// the time matches the panel's reset basis (the metric's own timezone).
     public static func shortClockString(_ date: Date, timeZone: TimeZone?) -> String {
+        format(date, "HH:mm", timeZone: timeZone)
+    }
+
+    private static func format(_ date: Date, _ pattern: String, timeZone: TimeZone?) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US")
         formatter.timeZone = timeZone ?? TimeZone.current
-        formatter.dateFormat = "HH:mm"
+        formatter.dateFormat = pattern
         return formatter.string(from: date)
     }
 }

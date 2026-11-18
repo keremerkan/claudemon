@@ -95,3 +95,33 @@ public struct VerticalUsageBar: View {
         precise ? AnyShape(Rectangle()) : AnyShape(Capsule())
     }
 }
+
+/// A circular usage gauge shared by the floating window and the widget: a
+/// faint full track plus an arc for `percent` (clamped 0–100), colored with
+/// the shared `UsageColor` thresholds. The stroke is inset so the ring stays
+/// inside its frame; a plain `.stroke` is centered on the path and would
+/// spill half the line width onto neighboring views.
+public struct UsageRing: View {
+    private let percent: Int
+    private let lineWidth: CGFloat
+
+    public init(percent: Int, lineWidth: CGFloat) {
+        self.percent = percent
+        self.lineWidth = lineWidth
+    }
+
+    public var body: some View {
+        let clamped = max(0, min(100, percent))
+        ZStack {
+            Circle()
+                .inset(by: lineWidth / 2)
+                .stroke(Color.primary.opacity(0.12), lineWidth: lineWidth)
+            Circle()
+                .inset(by: lineWidth / 2)
+                .trim(from: 0, to: CGFloat(clamped) / 100)
+                .stroke(UsageColor.color(for: clamped),
+                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+        }
+    }
+}

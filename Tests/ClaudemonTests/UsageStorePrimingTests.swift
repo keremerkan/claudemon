@@ -142,21 +142,31 @@ final class UsageStorePrimingTests: XCTestCase {
         XCTAssertNotNil(store.lastGoodReport, "Primed last-good guards against a drop to .loading")
     }
 
-    /// The CLI omits the session line while no 5-hour window is active. A
-    /// report with only weekly limits must still drive the menu bar, with the
-    /// session at 0% (as the floating window and widget already show it).
-    func testMissingSessionLineReadsAsZeroPercent() {
+    /// Accounts without a session limit (Max plans) get no session line from
+    /// the CLI. The all-models week must take over the menu bar, and the
+    /// second bar must then show the per-model week, not the same limit again.
+    func testWithoutSessionLimitWeekAllIsPrimary() {
         let weekAll = UsageMetric(
             kind: .weekAll, rawLabel: "Current week (all models)", percent: 31,
             resetDate: date(2026, 11, 19, 8, 59), timezoneIdentifier: "Europe/Istanbul"
         )
-        let report = UsageReport(metrics: [weekAll], capturedAt: date(2026, 11, 18, 10, 0))
+        let weekModel = UsageMetric(
+            kind: .weekModel, rawLabel: "Current week (Fable)", percent: 53,
+            resetDate: date(2026, 11, 19, 8, 59), timezoneIdentifier: "Europe/Istanbul"
+        )
+        let report = UsageReport(metrics: [weekAll, weekModel], capturedAt: date(2026, 11, 18, 10, 0))
         let cache = SharedUsageCache(baseDirectory: tempDir)
         cache.write(CachedUsage(report: report, state: .ok, errorMessage: nil, writtenAt: report.capturedAt))
 
         let store = UsageStore(cache: cache)
-        XCTAssertNil(store.sessionPercent, "No data yet: no percent")
+        XCTAssertNil(store.primaryMetric, "No data yet: no primary limit")
+        XCTAssertTrue(store.hasSessionLimit, "Assume a session limit until a report says otherwise")
         store.primeFromCache()
-        XCTAssertEqual(store.sessionPercent, 0)
+        XCTAssertFalse(store.hasSessionLimit)
+        XCTAssertEqual(store.primaryMetric?.kind, .weekAll)
+        XCTAssertEqual(store.primaryMetric?.percent, 31)
+        store.menuBarWeekBarSource = .allModels
+        XCTAssertEqual(store.menuBarWeekMetric?.kind, .weekModel,
+                       "The second bar must not repeat the all-models week")
     }
 }

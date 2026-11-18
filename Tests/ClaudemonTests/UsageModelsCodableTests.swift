@@ -123,4 +123,41 @@ final class UsageModelsCodableTests: XCTestCase {
         XCTAssertEqual(decoded.writtenAt, payload.writtenAt)
         XCTAssertEqual(decoded.report, report)
     }
+
+    // MARK: - Primary / secondary limits
+
+    private func metric(_ kind: UsageMetric.Kind, _ label: String, _ percent: Int) -> UsageMetric {
+        UsageMetric(kind: kind, rawLabel: label, percent: percent, resetDate: nil, timezoneIdentifier: nil)
+    }
+
+    /// With a session limit, the session is primary and both weeks follow.
+    func testPrimaryIsSessionWhenReported() {
+        let report = UsageReport(metrics: [
+            metric(.session, "Current session", 12),
+            metric(.weekAll, "Current week (all models)", 31),
+            metric(.weekModel, "Current week (Fable)", 53),
+        ], capturedAt: Date())
+        XCTAssertEqual(report.primary?.kind, .session)
+        XCTAssertEqual(report.secondary.map(\.kind), [.weekAll, .weekModel])
+    }
+
+    /// Max plans have no session limit (no session line): the all-models week
+    /// becomes primary and only the per-model week follows.
+    func testPrimaryFallsBackToWeekAllWithoutSession() {
+        let report = UsageReport(metrics: [
+            metric(.weekAll, "Current week (all models)", 31),
+            metric(.weekModel, "Current week (Fable)", 53),
+        ], capturedAt: Date())
+        XCTAssertEqual(report.primary?.kind, .weekAll)
+        XCTAssertEqual(report.secondary.map(\.kind), [.weekModel])
+        XCTAssertEqual(report.primary?.shortLabel, "Week")
+        XCTAssertEqual(report.secondary.first?.shortLabel, "Fable")
+    }
+
+    func testShortDateStringUsesMetricTimezone() throws {
+        // 2026-11-18 22:30 UTC is already Nov 19 in Istanbul (UTC+3).
+        let date = Date(timeIntervalSince1970: 1_795_041_000)
+        XCTAssertEqual(UsageFormatting.shortDateString(date, timeZone: TimeZone(identifier: "UTC")), "Nov 18")
+        XCTAssertEqual(UsageFormatting.shortDateString(date, timeZone: TimeZone(identifier: "Europe/Istanbul")), "Nov 19")
+    }
 }

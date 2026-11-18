@@ -1,3 +1,4 @@
+import AppKit
 import WidgetKit
 import SwiftUI
 import ClaudemonCore
@@ -22,45 +23,65 @@ struct ClaudemonWidgetView: View {
     }
 }
 
-// MARK: - Small: session ring + weekly percent
+// MARK: - Small: primary-limit ring + the next limit's percent
 
+/// The ring shows `UsageReport.primary` (the session, or the all-models week
+/// for accounts without a session limit); the line below it shows the first
+/// remaining limit.
 struct SmallUsageView: View {
     let report: UsageReport
     let capturedAt: Date?
     let isStale: Bool
 
-    private var session: Int { report.session?.percent ?? 0 }
-    private var week: Int { report.weekAll?.percent ?? 0 }
+    private var primary: UsageMetric? { report.primary }
+    private var ringPercent: Int { primary?.percent ?? 0 }
+    private var ringLabel: String { primary?.shortLabel ?? UsageMetric.Kind.session.shortName }
+    private var next: UsageMetric? { report.secondary.first }
+
+    /// Blank space a `.callout` line keeps below its baseline. The "as of"
+    /// line ends with it, so the ring gets the same inset on top and the
+    /// visible gaps to the top and bottom edges match.
+    private static let footerDescent = -NSFont.preferredFont(forTextStyle: .callout).descender
 
     var body: some View {
+        // The ring sits at the top edge and the text block at the bottom edge,
+        // so both get the same widget content margin. The ring takes all the
+        // height the text doesn't need.
         VStack(spacing: 0) {
-            Spacer(minLength: 0)
-
             ring
+                .padding(.top, Self.footerDescent)
+                .layoutPriority(1)
 
-            Spacer(minLength: 0)
+            VStack(spacing: 2) {
+                if let next {
+                    HStack(spacing: 4) {
+                        Text(next.shortLabel)
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                        Text("\(next.percent)%")
+                            .font(.title3.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(UsageColor.color(for: next.percent))
+                    }
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                }
 
-            HStack(spacing: 4) {
-                Text("Week")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Text("\(week)%")
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(UsageColor.color(for: week))
+                footerLine
             }
-            .minimumScaleFactor(0.7)
-            .lineLimit(1)
-
-            Spacer(minLength: 0)
-
-            footerLine
+            // Claim the text's full height up front. Without this the stack
+            // only reserves its minimumScaleFactor height, hands the rest to
+            // the ring, then draws full-size text and overflows the margins.
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Session \(session) percent, Week \(week) percent")
+        .accessibilityLabel([primary, next].compactMap { $0 }
+            .map { "\($0.shortLabel) \($0.percent) percent" }
+            .joined(separator: ", "))
     }
 
-    /// Session ring that scales to fill the available width using GeometryReader.
+    /// Ring that scales to fill the available width using GeometryReader.
     private var ring: some View {
         GeometryReader { geo in
             let diameter = min(geo.size.width, geo.size.height)
@@ -69,18 +90,13 @@ struct SmallUsageView: View {
             let captionFont = diameter * 0.11
 
             ZStack {
-                Circle().stroke(Color.primary.opacity(0.12), lineWidth: lineWidth)
-                Circle()
-                    .trim(from: 0, to: CGFloat(min(session, 100)) / 100.0)
-                    .stroke(UsageColor.color(for: session),
-                            style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
+                UsageRing(percent: ringPercent, lineWidth: lineWidth)
                 VStack(spacing: 1) {
-                    Text("\(session)%")
+                    Text("\(ringPercent)%")
                         .font(.system(size: percentFont, weight: .bold).monospacedDigit())
                         .minimumScaleFactor(0.5)
                         .lineLimit(1)
-                    Text("session")
+                    Text(ringLabel)
                         .font(.system(size: captionFont, weight: .medium))
                         .textCase(.uppercase)
                         .foregroundStyle(.secondary)
@@ -98,7 +114,7 @@ struct SmallUsageView: View {
     @ViewBuilder private var footerLine: some View {
         if let capturedAt {
             Text("\(isStale ? "stale · " : "")as of \(UsageFormatting.shortClockString(capturedAt))")
-                .font(.caption2)
+                .font(.callout)
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
                 .foregroundStyle(isStale ? .orange : .secondary)
@@ -139,7 +155,7 @@ struct MediumUsageView: View {
     private func bar(for metric: UsageMetric) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack {
-                Text(metric.kind == .weekModel ? metric.modelName : metric.kind.shortName)
+                Text(metric.shortLabel)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Spacer()

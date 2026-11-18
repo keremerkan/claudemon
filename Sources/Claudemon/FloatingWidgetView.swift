@@ -2,8 +2,9 @@ import SwiftUI
 import ClaudemonCore
 
 /// Compact always-on-top widget content. Renders one of two forms:
-/// - LARGE: a session ring + weekly bars + footer.
-/// - MINI:  just the session ring (percent + "SESSION").
+/// - LARGE: a ring for the primary limit + bars for the other limits + footer.
+/// - MINI:  just the ring (percent + "SESSION", or "WEEK" for accounts
+///          without a session limit; see `UsageReport.primary`).
 /// Double-clicking the panel toggles between them (wired in the controller).
 struct FloatingWidgetView: View {
 
@@ -46,7 +47,7 @@ struct FloatingWidgetView: View {
             } else {
                 VStack(spacing: 6) {
                     HStack(spacing: 14) {
-                        sessionRing
+                        primaryRing
                         weeklyColumn
                     }
                     footer
@@ -65,10 +66,10 @@ struct FloatingWidgetView: View {
 
     // MARK: - Mini form
 
-    /// A single, larger session ring centered in a compact rounded-square panel.
+    /// A single, larger ring centered in a compact rounded-square panel.
     /// Reuses the exact ring rendering/colors of the large form.
     private var miniBody: some View {
-        sessionRingView(diameter: 62, lineWidth: 7, percentFont: 18, labelFont: 8)
+        ringView(diameter: 69, lineWidth: 7, percentFont: 18, labelFont: 8)
             .frame(width: Self.miniContentSize.width, height: Self.miniContentSize.height)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
             .overlay(
@@ -95,42 +96,32 @@ struct FloatingWidgetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var sessionPercent: Int { store.lastGoodReport?.session?.percent ?? 0 }
-    private var weekPercent: Int { store.lastGoodReport?.weekAll?.percent ?? 0 }
-    private var weekModelMetric: UsageMetric? { store.lastGoodReport?.weekModel }
-    private var weekModelPercent: Int { weekModelMetric?.percent ?? 0 }
-    private var weekModelLabel: String { weekModelMetric?.modelName ?? UsageMetric.Kind.weekModel.shortName }
+    private var primary: UsageMetric? { store.primaryMetric }
+    private var primaryPercent: Int { primary?.percent ?? 0 }
 
     private var hasData: Bool { store.lastGoodReport != nil }
 
     // MARK: - Ring
 
-    /// The large form's session ring (preserved sizing).
-    private var sessionRing: some View {
-        sessionRingView(diameter: 58, lineWidth: 7, percentFont: 17, labelFont: 8)
+    /// The large form's ring (preserved sizing).
+    private var primaryRing: some View {
+        ringView(diameter: 65, lineWidth: 7, percentFont: 17, labelFont: 8)
     }
 
-    /// Shared session-ring rendering used by both the large and mini forms.
-    /// Same track/trim/color logic; only the dimensions and type scale differ.
-    private func sessionRingView(
+    /// Shared ring rendering for the primary limit, used by both the large and
+    /// mini forms. Same track/trim/color logic; only the dimensions and type
+    /// scale differ.
+    private func ringView(
         diameter: CGFloat,
         lineWidth: CGFloat,
         percentFont: CGFloat,
         labelFont: CGFloat
     ) -> some View {
         ZStack {
-            Circle()
-                .stroke(Color.primary.opacity(0.12), lineWidth: lineWidth)
-            Circle()
-                .trim(from: 0, to: CGFloat(min(sessionPercent, 100)) / 100.0)
-                .stroke(
-                    UsageColor.color(for: sessionPercent),
-                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
+            UsageRing(percent: primaryPercent, lineWidth: lineWidth)
             VStack(spacing: 1) {
                 if hasData {
-                    Text("\(sessionPercent)%")
+                    Text("\(primaryPercent)%")
                         .font(.system(size: percentFont, weight: .bold).monospacedDigit())
                         .foregroundStyle(.primary)
                 } else {
@@ -138,7 +129,7 @@ struct FloatingWidgetView: View {
                         .font(.system(size: percentFont * 0.82, weight: .bold))
                         .foregroundStyle(.secondary)
                 }
-                Text("session")
+                Text(primary?.shortLabel ?? UsageMetric.Kind.session.shortName)
                     .font(.system(size: labelFont, weight: .medium))
                     .textCase(.uppercase)
                     .foregroundStyle(.secondary)
@@ -151,24 +142,31 @@ struct FloatingWidgetView: View {
 
     private var weeklyColumn: some View {
         VStack(alignment: .leading, spacing: 9) {
-            metricLine(label: "Week", percent: weekPercent)
-            metricLine(label: weekModelLabel, percent: weekModelPercent)
+            if let report = store.lastGoodReport {
+                ForEach(report.secondary) { metric in
+                    metricLine(label: metric.shortLabel, percent: metric.percent)
+                }
+            } else {
+                metricLine(label: UsageMetric.Kind.weekAll.shortName, percent: nil)
+                metricLine(label: UsageMetric.Kind.weekModel.shortName, percent: nil)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func metricLine(label: String, percent: Int) -> some View {
+    /// A labeled bar; a nil percent (no data yet) shows a dash and an empty bar.
+    private func metricLine(label: String, percent: Int?) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 4) {
                 Text(label)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 4)
-                Text(hasData ? "\(percent)%" : "—")
+                Text(percent.map { "\($0)%" } ?? "—")
                     .font(.system(size: 11, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(hasData ? UsageColor.color(for: percent) : .secondary)
+                    .foregroundStyle(percent.map { UsageColor.color(for: $0) } ?? .secondary)
             }
-            UsageBar(percent: hasData ? percent : 0, height: 5, precise: store.preciseBars)
+            UsageBar(percent: percent ?? 0, height: 5, precise: store.preciseBars)
         }
     }
 
@@ -214,25 +212,29 @@ struct FloatingWidgetView: View {
 
     private func footerTimeText(prefix: String) -> String {
         guard let updated = store.lastUpdated else { return prefix.trimmingCharacters(in: .whitespaces) }
-        let resetSuffix = sessionResetSuffix
+        let resetSuffix = resetHint.map { " · " + $0 } ?? ""
         let staleHint = (store.dataAge ?? 0) > 10 * 60 ? " · stale" : ""
         return prefix + UsageFormatting.shortClockString(updated) + resetSuffix + staleHint
     }
 
-    /// " · resets at HH:mm" in the session metric's own timezone, or "" when
-    /// no session reset date is available.
-    private var sessionResetSuffix: String {
-        guard let session = store.lastGoodReport?.session, let resetDate = session.resetDate else { return "" }
-        return " · resets at " + UsageFormatting.shortClockString(resetDate, timeZone: session.timezone)
+    /// When the primary limit resets, in its own timezone: "resets at HH:mm"
+    /// for the 5-hour session, "resets Nov 19" for a week. Nil without a date.
+    private var resetHint: String? {
+        guard let primary, let resetDate = primary.resetDate else { return nil }
+        return primary.kind == .session
+            ? "resets at " + UsageFormatting.shortClockString(resetDate, timeZone: primary.timezone)
+            : "resets " + UsageFormatting.shortDateString(resetDate, timeZone: primary.timezone)
     }
 
     private var accessibilitySummary: String {
         if store.isNotInstalled { return "Claude Code isn't installed. Install the CLI to see usage." }
         if store.isNotSignedIn { return "Sign in to Claude Code. Run claude then slash login." }
-        guard hasData else { return store.errorMessage ?? "Loading usage" }
-        var summary = "Session \(sessionPercent) percent, Week \(weekPercent) percent, \(weekModelLabel) \(weekModelPercent) percent"
-        if let session = store.lastGoodReport?.session, let resetDate = session.resetDate {
-            summary += ", session resets at \(UsageFormatting.shortClockString(resetDate, timeZone: session.timezone))"
+        guard let report = store.lastGoodReport else { return store.errorMessage ?? "Loading usage" }
+        var summary = report.metrics
+            .map { "\($0.shortLabel) \($0.percent) percent" }
+            .joined(separator: ", ")
+        if let resetHint, let primary {
+            summary += ", \(primary.shortLabel.lowercased()) \(resetHint)"
         }
         return summary
     }

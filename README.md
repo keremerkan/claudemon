@@ -18,6 +18,11 @@ only)** wording after Anthropic added the Fable model) — each with a labeled
 progress bar, the percent used, a `resets in Xh Ym` countdown, and the
 absolute reset time in the limit's own timezone.
 
+Max plans no longer have a session limit, and Claude Code doesn't report one
+for them. When there's no session limit, Claudemon hides it and the **Current
+Week (all models)** limit takes its place in the menu bar, the floating
+window's ring and the small widget's ring.
+
 > **Unofficial tool.** Claudemon is a third-party app and is **not affiliated
 > with, endorsed by, or sponsored by Anthropic**. See the
 > [Disclaimer](#disclaimer) below.
@@ -256,7 +261,7 @@ entitlements.
 
 ```bash
 swift build   # debug build of ClaudemonCore + the app
-swift test    # runs the unit test suite (currently 102 tests)
+swift test    # runs the unit test suite (currently 105 tests)
 ```
 
 ## Release / signing (building the signed DMG)

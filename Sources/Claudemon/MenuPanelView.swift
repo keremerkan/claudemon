@@ -266,7 +266,9 @@ struct MenuPanelView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         barsOptionToggle("Weekly bar", isOn: $store.menuBarShowsWeekBar)
-                        if store.menuBarShowsWeekBar {
+                        // Without a session limit the second bar always shows
+                        // the per-model week, so there is nothing to choose.
+                        if store.menuBarShowsWeekBar, store.hasSessionLimit {
                             Picker("Weekly bar source", selection: $store.menuBarWeekBarSource) {
                                 Text("All models").tag(MenuBarWeekBarSource.allModels)
                                 Text(store.weekModelName).tag(MenuBarWeekBarSource.perModel)

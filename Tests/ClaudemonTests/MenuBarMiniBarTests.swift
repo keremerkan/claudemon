@@ -60,9 +60,9 @@ final class MenuBarMiniBarTests: XCTestCase {
 
     func testBarsConfigurationEquatableCoversAllFields() {
         let base = MenuBarBarsView.Configuration(
-            sessionPercent: 40, weekPercent: 20, showsPercent: true, isVertical: false)
+            primaryPercent: 40, weekPercent: 20, showsPercent: true, isVertical: false)
         XCTAssertEqual(base, MenuBarBarsView.Configuration(
-            sessionPercent: 40, weekPercent: 20, showsPercent: true, isVertical: false))
+            primaryPercent: 40, weekPercent: 20, showsPercent: true, isVertical: false))
 
         XCTAssertFalse(base.preciseFill, "preciseFill must default to false")
         XCTAssertFalse(base.halfWidthBars, "halfWidthBars must default to false")
@@ -70,7 +70,7 @@ final class MenuBarMiniBarTests: XCTestCase {
         // Each field independently participates in equality — the app relies
         // on this to know when the menu-bar raster must change.
         var changed = base
-        changed.sessionPercent = 41
+        changed.primaryPercent = 41
         XCTAssertNotEqual(base, changed)
 
         changed = base

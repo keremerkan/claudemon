@@ -53,7 +53,7 @@ final class UsageParserTests: XCTestCase {
         XCTAssertEqual(session.percent, 27)
         XCTAssertEqual(weekAll.percent, 29)
         XCTAssertEqual(weekModel.percent, 2)
-        XCTAssertEqual(weekModel.modelName, "Fable", "Model name should be read from the label, not hardcoded")
+        XCTAssertEqual(weekModel.shortLabel, "Fable", "Model name should be read from the label, not hardcoded")
 
         XCTAssertEqual(session.timezoneIdentifier, "Europe/Istanbul")
         XCTAssertEqual(weekAll.timezoneIdentifier, "Europe/Istanbul")
@@ -94,7 +94,7 @@ final class UsageParserTests: XCTestCase {
             let report = try UsageParser.parse(resultText: text, now: now)
             let m = try XCTUnwrap(report.weekModel, "Model line '\(modelName)' should classify as weekModel")
             XCTAssertEqual(m.percent, 12)
-            XCTAssertEqual(m.modelName, modelName)
+            XCTAssertEqual(m.shortLabel, modelName)
         }
     }
 

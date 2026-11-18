@@ -469,23 +469,29 @@ final class UsageStore: ObservableObject {
         return text
     }
 
-    /// Session percent for the compact menu-bar label, or nil with no data.
-    /// The CLI omits the session line while no 5-hour window is active, so a
-    /// report without one means 0% (matching the floating window and widget).
-    var sessionPercent: Int? {
-        lastGoodReport.map { $0.session?.percent ?? 0 }
+    /// The headline limit for the menu-bar label (see `UsageReport.primary`).
+    var primaryMetric: UsageMetric? {
+        lastGoodReport?.primary
     }
 
-    /// The weekly metric the menu-bar bar graph's second bar tracks, per the
-    /// user's `menuBarWeekBarSource` choice, if available.
+    /// False when the account has no session limit (the CLI reports none, as
+    /// on Max plans). True until the first report lands.
+    var hasSessionLimit: Bool {
+        lastGoodReport.map { $0.session != nil } ?? true
+    }
+
+    /// The weekly metric the menu-bar bar graph's second bar tracks: the
+    /// user's `menuBarWeekBarSource` choice, or the per-model week when the
+    /// all-models week is already the primary bar (no session limit).
     var menuBarWeekMetric: UsageMetric? {
-        lastGoodReport?.metric(menuBarWeekBarSource.metricKind)
+        guard let report = lastGoodReport else { return nil }
+        return report.metric(hasSessionLimit ? menuBarWeekBarSource.metricKind : .weekModel)
     }
 
     /// Settings label for the per-model weekly source: the model name Anthropic
     /// currently reports there ("Fable"), or a generic fallback before the
     /// first report lands.
     var weekModelName: String {
-        lastGoodReport?.weekModel?.modelName ?? UsageMetric.Kind.weekModel.shortName
+        lastGoodReport?.weekModel?.shortLabel ?? UsageMetric.Kind.weekModel.shortName
     }
 }

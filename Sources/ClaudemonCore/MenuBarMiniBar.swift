@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// How the menu-bar label presents the live session usage. Persisted by
+/// How the menu-bar label presents the live usage (the report's primary limit). Persisted by
 /// `UsageStore` as a raw string and chosen by the user in the settings footer.
 public enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
     case iconAndText
@@ -23,7 +23,7 @@ public enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
 
 /// Which weekly limit the menu-bar bar graph's second bar tracks. Persisted
 /// by `UsageStore` as a raw string. The per-model case's user-facing label is
-/// the model name Anthropic currently reports (see `UsageMetric.modelName`),
+/// the model name Anthropic currently reports (see `UsageMetric.shortLabel`),
 /// so it is not hardcoded here.
 public enum MenuBarWeekBarSource: String, CaseIterable, Identifiable {
     /// Current Week (all models).
@@ -42,8 +42,9 @@ public enum MenuBarWeekBarSource: String, CaseIterable, Identifiable {
     }
 }
 
-/// Fixed-size bar-graph content for the menu-bar label: the session limit as a
-/// bar, optionally the weekly (all models) limit as a second bar, and
+/// Fixed-size bar-graph content for the menu-bar label: the primary limit (the
+/// session, or the all-models week for accounts without one) as a bar,
+/// optionally a weekly limit as a second bar, and
 /// optionally the percent value(s) beside the bars. Bars use the shared
 /// `UsageColor` thresholds so they match the in-app usage bars.
 ///
@@ -56,8 +57,9 @@ public struct MenuBarBarsView: View {
     /// Everything that affects the rendered pixels, grouped so the app can
     /// compare configurations cheaply when deciding whether to re-render.
     public struct Configuration: Equatable {
-        public var sessionPercent: Int
-        /// Weekly (all models) percent; nil renders the session bar only.
+        /// The report's primary limit (see `UsageReport.primary`).
+        public var primaryPercent: Int
+        /// The second bar's weekly percent; nil renders the primary bar only.
         public var weekPercent: Int?
         public var showsPercent: Bool
         public var isVertical: Bool
@@ -67,11 +69,11 @@ public struct MenuBarBarsView: View {
         /// mode, where the bar length is the menu-bar content height.
         public var halfWidthBars: Bool
 
-        public init(sessionPercent: Int, weekPercent: Int?,
+        public init(primaryPercent: Int, weekPercent: Int?,
                     showsPercent: Bool, isVertical: Bool,
                     preciseFill: Bool = false,
                     halfWidthBars: Bool = false) {
-            self.sessionPercent = sessionPercent
+            self.primaryPercent = primaryPercent
             self.weekPercent = weekPercent
             self.showsPercent = showsPercent
             self.isVertical = isVertical
@@ -116,7 +118,7 @@ public struct MenuBarBarsView: View {
 
     private var horizontalBars: some View {
         VStack(alignment: .leading, spacing: 2) {
-            UsageBar(percent: config.sessionPercent, height: barThickness,
+            UsageBar(percent: config.primaryPercent, height: barThickness,
                      precise: config.preciseFill)
                 .frame(width: barLength)
             if let week = config.weekPercent {
@@ -129,7 +131,7 @@ public struct MenuBarBarsView: View {
 
     private var verticalBars: some View {
         HStack(spacing: 3) {
-            VerticalUsageBar(percent: config.sessionPercent, width: barThickness,
+            VerticalUsageBar(percent: config.primaryPercent, width: barThickness,
                              precise: config.preciseFill)
                 .frame(height: Self.contentHeight)
             if let week = config.weekPercent {
@@ -154,12 +156,12 @@ public struct MenuBarBarsView: View {
             // Two bars: both percents, vertically stacked in a smaller font.
             // Order matches the bars (session first, week second).
             VStack(alignment: .leading, spacing: 0) {
-                percentText(config.sessionPercent, size: 8)
+                percentText(config.primaryPercent, size: 8)
                 percentText(week, size: 8)
             }
             .frame(width: 25, alignment: .leading)
         } else {
-            percentText(config.sessionPercent, size: 11)
+            percentText(config.primaryPercent, size: 11)
                 .frame(width: 33, alignment: .leading)
         }
     }
