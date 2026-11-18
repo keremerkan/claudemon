@@ -4,7 +4,7 @@
 # stapled Claudemon.dmg for sharing outside the App Store.
 #
 # Pipeline:
-#   1. XcodeGen generate + xcodebuild Release (codesigning OFF at build time)
+#   1. xcodebuild Release from Claudemon.xcodeproj (codesigning OFF at build time)
 #   2. Sign inside-out with Developer ID, Hardened Runtime + secure timestamp,
 #      per-target entitlements: framework -> widget appex -> app
 #   3. Verify signatures (codesign --verify --deep --strict)
@@ -13,7 +13,7 @@
 #   6. Gatekeeper assessment (spctl)
 #
 # Requirements (already set up on the build machine):
-#   - Developer ID Application identity in the keychain (team 3QKMW9HR59)
+#   - Developer ID Application identity in the keychain (team GH4CGS3B5H)
 #   - A notarytool keychain profile (default name: "claudemon")
 #
 set -euo pipefail
@@ -24,8 +24,8 @@ WIDGET_NAME="ClaudemonWidget"
 SCHEME="Claudemon"
 CONFIG="Release"
 
-DEV_ID="Developer ID Application: Arda Balkan (3QKMW9HR59)"
-TEAM_ID="3QKMW9HR59"
+DEV_ID="Developer ID Application: AKE Software GmbH (GH4CGS3B5H)"
+TEAM_ID="GH4CGS3B5H"
 NOTARY_PROFILE="${NOTARY_PROFILE:-claudemon}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -49,15 +49,7 @@ DMG_PATH="${DIST_DIR}/${APP_NAME}.dmg"
 
 log() { echo ""; echo "==> $*"; }
 
-# --- 1. Generate + build ----------------------------------------------------
-if ! command -v xcodegen >/dev/null 2>&1; then
-  command -v brew >/dev/null 2>&1 && brew install xcodegen \
-    || { echo "ERROR: xcodegen + brew unavailable" >&2; exit 1; }
-fi
-
-log "Generating ${APP_NAME}.xcodeproj"
-xcodegen generate
-
+# --- 1. Build ---------------------------------------------------------------
 log "Building ${SCHEME} (${CONFIG}, codesigning off)"
 rm -rf "${DD}"
 xcodebuild \

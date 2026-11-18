@@ -387,19 +387,19 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					0204B2F7C9F05A11E98F03E7 = {
-						DevelopmentTeam = 3QKMW9HR59;
+						DevelopmentTeam = GH4CGS3B5H;
 						ProvisioningStyle = Manual;
 					};
 					59F32843228534329091C44C = {
-						DevelopmentTeam = 3QKMW9HR59;
+						DevelopmentTeam = GH4CGS3B5H;
 						ProvisioningStyle = Manual;
 					};
 					66437C394DA9F97C527E32AF = {
-						DevelopmentTeam = 3QKMW9HR59;
+						DevelopmentTeam = GH4CGS3B5H;
 						ProvisioningStyle = Manual;
 					};
 					B0CBB2DDBBA49798C0894133 = {
-						DevelopmentTeam = 3QKMW9HR59;
+						DevelopmentTeam = GH4CGS3B5H;
 						ProvisioningStyle = Manual;
 					};
 				};
@@ -419,9 +419,9 @@
 			projectRoot = "";
 			targets = (
 				66437C394DA9F97C527E32AF /* Claudemon */,
+				0204B2F7C9F05A11E98F03E7 /* ClaudemonWidget */,
 				B0CBB2DDBBA49798C0894133 /* ClaudemonCore */,
 				59F32843228534329091C44C /* ClaudemonTests */,
-				0204B2F7C9F05A11E98F03E7 /* ClaudemonWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -534,11 +534,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Support/Claudemon.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 17;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = "Support/Claudemon-Info.plist";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"@executable_path/../Frameworks",
-				);
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				MARKETING_VERSION = 1.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.claudemon.app;
 				SDKROOT = macosx;
 			};
@@ -600,7 +600,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 16;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 3QKMW9HR59;
+				DEVELOPMENT_TEAM = GH4CGS3B5H;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -635,11 +635,11 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Support/ClaudemonWidget.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 17;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = "Support/ClaudemonWidget-Info.plist";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"@executable_path/../../../../Frameworks",
-				);
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../../../../Frameworks";
+				MARKETING_VERSION = 1.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.claudemon.app.widget;
 				SDKROOT = macosx;
 			};
@@ -685,7 +685,7 @@
 				COPY_PHASE_STRIP = NO;
 				CURRENT_PROJECT_VERSION = 16;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = 3QKMW9HR59;
+				DEVELOPMENT_TEAM = GH4CGS3B5H;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -776,11 +776,11 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Support/Claudemon.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 17;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = "Support/Claudemon-Info.plist";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"@executable_path/../Frameworks",
-				);
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../Frameworks";
+				MARKETING_VERSION = 1.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.claudemon.app;
 				SDKROOT = macosx;
 			};
@@ -791,11 +791,11 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = Support/ClaudemonWidget.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 17;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = "Support/ClaudemonWidget-Info.plist";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"@executable_path/../../../../Frameworks",
-				);
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/../../../../Frameworks";
+				MARKETING_VERSION = 1.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.claudemon.app.widget;
 				SDKROOT = macosx;
 			};

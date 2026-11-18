@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# build-xcode.sh — generate the Xcode project (via XcodeGen), build the app +
-# embedded WidgetKit extension in Release, and ad-hoc sign both with their
-# App-Group entitlements so they run locally.
+# build-xcode.sh — build the app + embedded WidgetKit extension in Release from
+# the committed Claudemon.xcodeproj, and ad-hoc sign both with their App-Group
+# entitlements so they run locally.
 #
 # Usage:  ./scripts/build-xcode.sh
 #
@@ -36,21 +36,6 @@ FRAMEWORK="${APP_BUNDLE}/Contents/Frameworks/${APP_NAME}Core.framework"
 
 APP_ENTITLEMENTS="${ROOT_DIR}/Support/${APP_NAME}.entitlements"
 WIDGET_ENTITLEMENTS="${ROOT_DIR}/Support/${WIDGET_NAME}.entitlements"
-
-# --- Ensure the Xcode project exists (XcodeGen) -----------------------------
-if ! command -v xcodegen >/dev/null 2>&1; then
-  if command -v brew >/dev/null 2>&1; then
-    echo "==> Installing XcodeGen via Homebrew…"
-    brew install xcodegen
-  else
-    echo "ERROR: xcodegen not found and Homebrew unavailable." >&2
-    echo "       Install XcodeGen: https://github.com/yonaskolb/XcodeGen" >&2
-    exit 1
-  fi
-fi
-
-echo "==> Generating ${APP_NAME}.xcodeproj…"
-xcodegen generate
 
 # --- Build ------------------------------------------------------------------
 echo "==> Building ${SCHEME} (${CONFIG})…"

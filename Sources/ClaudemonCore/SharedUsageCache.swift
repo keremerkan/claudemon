@@ -13,7 +13,7 @@ private let sharedUsageCacheLogger = Logger(
 /// `Support/Claudemon.entitlements` and `Support/ClaudemonWidget.entitlements`.
 /// There is intentionally NO fallback: writer and reader must resolve the exact
 /// same container, otherwise the widget silently reads a divergent stale file.
-public let claudemonAppGroupID = "3QKMW9HR59.group.com.claudemon.app"
+public let claudemonAppGroupID = "GH4CGS3B5H.group.com.claudemon.app"
 
 /// The widget kind string, shared so the app can request reloads by name.
 public let claudemonWidgetKind = "ClaudemonWidget"

@@ -206,7 +206,7 @@ keeps polling. Polling pauses on system sleep and resumes on wake.
 
 WidgetKit extensions are sandboxed and cannot run `claude` or hit the network.
 Instead, the app writes each successful poll to a JSON cache in the shared App
-Group container (`3QKMW9HR59.group.com.claudemon.app`), and the widget reads
+Group container (`GH4CGS3B5H.group.com.claudemon.app`), and the widget reads
 **only** from that cache. Both targets carry the App Group entitlement
 (`Support/Claudemon.entitlements`, `Support/ClaudemonWidget.entitlements`).
 Because the main app is non-sandboxed, this data bridge only works in the
@@ -256,17 +256,7 @@ entitlements.
 
 ```bash
 swift build   # debug build of ClaudemonCore + the app
-swift test    # runs the unit test suite (currently 100 tests)
-```
-
-### XcodeGen (optional regeneration fallback)
-
-`project.yml` is an [XcodeGen](https://github.com/yonaskolb/XcodeGen) spec kept
-as optional documentation and a regeneration fallback. The `.xcodeproj` is the
-source you open day to day; only run this if you need to rebuild it:
-
-```bash
-xcodegen generate   # regenerates Claudemon.xcodeproj from project.yml
+swift test    # runs the unit test suite (currently 102 tests)
 ```
 
 ## Release / signing (building the signed DMG)
@@ -280,7 +270,7 @@ xcodegen generate   # regenerates Claudemon.xcodeproj from project.yml
 
 The pipeline:
 
-1. `xcodegen generate` + `xcodebuild` Release (codesigning is **off** at build
+1. `xcodebuild` Release from `Claudemon.xcodeproj` (codesigning is **off** at build
    time, so no provisioning profile is needed during the build).
 2. Sign inside-out with the **Developer ID Application** identity, **Hardened
    Runtime** (`--options runtime`) and a secure `--timestamp`, applying each
