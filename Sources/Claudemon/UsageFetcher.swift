@@ -91,30 +91,23 @@ struct UsageFetcher {
     }
 
     /// Cached resolved path for the session so we don't spawn a lookup shell on
-    /// every poll. Reset to `nil` only on process restart.
-    private static let resolvedPathLock = NSLock()
-    nonisolated(unsafe) private static var cachedClaudePath: String?
-
-    /// Filesystem discovery (candidate paths + version-manager globs) lives in
-    /// the testable, process-free `ClaudeLocator` in ClaudemonCore.
-    private static let locator = ClaudeLocator()
+    /// every poll. Cleared by `invalidateCache()` when a launch fails.
+    private static let cachedClaudePath = OSAllocatedUnfairLock<String?>(initialState: nil)
 
     /// Resolve the absolute path of the `claude` executable, or nil.
     /// Order: session cache → filesystem candidates/globs (ClaudeLocator) →
     /// login-shell fallback (zsh, then bash). The result is cached for the
     /// session.
     static func resolveClaudePath() -> String? {
-        resolvedPathLock.lock()
-        if let cached = cachedClaudePath {
-            resolvedPathLock.unlock()
+        if let cached = cachedClaudePath.withLock({ $0 }) {
             return cached
         }
-        resolvedPathLock.unlock()
 
         let fm = FileManager.default
 
-        // 1+2. Concrete candidate paths, then version-manager globs (nvm/fnm).
-        if let found = locator.locateFromFilesystem() {
+        // 1+2. Concrete candidate paths, then version-manager globs (nvm/fnm),
+        // via the testable, process-free `ClaudeLocator` in ClaudemonCore.
+        if let found = ClaudeLocator().locateFromFilesystem() {
             return cache(found)
         }
 
@@ -132,9 +125,7 @@ struct UsageFetcher {
     }
 
     private static func cache(_ path: String) -> String {
-        resolvedPathLock.lock()
-        cachedClaudePath = path
-        resolvedPathLock.unlock()
+        cachedClaudePath.withLock { $0 = path }
         return path
     }
 
@@ -142,9 +133,7 @@ struct UsageFetcher {
     /// full discovery. Called when a launch fails (e.g. an nvm/fnm node-version
     /// switch moved the binary), so the app self-heals without a restart.
     static func invalidateCache() {
-        resolvedPathLock.lock()
-        cachedClaudePath = nil
-        resolvedPathLock.unlock()
+        cachedClaudePath.withLock { $0 = nil }
     }
 
     /// Resolve `claude` via a shell's `command -v`. When `login` is true a login
@@ -308,34 +297,27 @@ struct UsageFetcher {
 }
 
 /// Thread-safe accumulating byte buffer used to drain process pipes.
-private final class DataBuffer: @unchecked Sendable {
-    private let lock = NSLock()
-    private var storage = Data()
+private final class DataBuffer: Sendable {
+    private let storage = OSAllocatedUnfairLock(initialState: Data())
 
     func append(_ chunk: Data) {
         guard !chunk.isEmpty else { return }
-        lock.lock()
-        storage.append(chunk)
-        lock.unlock()
+        storage.withLock { $0.append(chunk) }
     }
 
     var data: Data {
-        lock.lock()
-        defer { lock.unlock() }
-        return storage
+        storage.withLock { $0 }
     }
 }
 
 /// Thread-safe single-shot guard to prevent double-resuming a continuation.
-private final class ResumeGuard: @unchecked Sendable {
-    private let lock = NSLock()
-    private var done = false
+private final class ResumeGuard: Sendable {
+    private let done = OSAllocatedUnfairLock(initialState: false)
 
     func tryResume() -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        if done { return false }
-        done = true
-        return true
+        done.withLock { done in
+            defer { done = true }
+            return !done
+        }
     }
 }

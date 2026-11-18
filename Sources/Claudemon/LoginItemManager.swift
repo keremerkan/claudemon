@@ -10,12 +10,13 @@ private let loginLog = Logger(subsystem: "com.claudemon.app", category: "LoginIt
 /// system status (which may be `.requiresApproval` until the user approves the
 /// item in System Settings > General > Login Items).
 @MainActor
-final class LoginItemManager: ObservableObject {
+@Observable
+final class LoginItemManager {
 
     static let intentKey = "launchAtLoginIntent"
 
     /// The user's desired on/off intent (drives the toggle).
-    @Published var isEnabled: Bool {
+    var isEnabled: Bool {
         didSet {
             guard !isSyncing, oldValue != isEnabled else { return }
             UserDefaults.standard.set(isEnabled, forKey: Self.intentKey)
@@ -25,10 +26,10 @@ final class LoginItemManager: ObservableObject {
     }
 
     /// The live system registration status.
-    @Published private(set) var status: SMAppService.Status = .notRegistered
+    private(set) var status: SMAppService.Status = .notRegistered
 
     /// Guards against the toggle's didSet firing while we sync from the system.
-    private var isSyncing = false
+    @ObservationIgnored private var isSyncing = false
 
     init() {
         self.isEnabled = UserDefaults.standard.bool(forKey: Self.intentKey)

@@ -7,18 +7,17 @@ import ClaudemonCore
 struct ClaudemonApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
-    // The single source of truth, owned by the app and shared with the delegate.
-    @StateObject private var store = ClaudemonAppState.shared.store
-    @StateObject private var loginItem = ClaudemonAppState.shared.loginItem
-    @StateObject private var notifications = ClaudemonAppState.shared.notifications
-    @StateObject private var updateChecker = ClaudemonAppState.shared.updateChecker
+    // The single source of truth, owned by ClaudemonAppState and shared with
+    // the delegate. @Observable models need no property wrapper here: views
+    // track what they read.
+    private let state = ClaudemonAppState.shared
 
     var body: some Scene {
         MenuBarExtra {
-            MenuPanelView(store: store, loginItem: loginItem,
-                          notifications: notifications, updateChecker: updateChecker)
+            MenuPanelView(store: state.store, loginItem: state.loginItem,
+                          notifications: state.notifications, updateChecker: state.updateChecker)
         } label: {
-            MenuBarLabel(store: store)
+            MenuBarLabel(store: state.store)
         }
         .menuBarExtraStyle(.window)
     }
@@ -40,7 +39,7 @@ final class ClaudemonAppState {
 /// session, or the all-models week without a session limit), or a rasterized
 /// bar graph in the `.bars` display mode.
 struct MenuBarLabel: View {
-    @ObservedObject var store: UsageStore
+    let store: UsageStore
 
     // The menu bar renders live label views as template (monochrome) content,
     // so the bar-graph mode is rasterized into a non-template NSImage. These

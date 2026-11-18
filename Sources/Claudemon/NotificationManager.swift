@@ -37,7 +37,8 @@ private let resetAlertBodyText = "Limit reset — your quota is available again.
 /// `UsageAlertPolicy` in the core; this type only handles persistence, OS
 /// authorization, and actually posting the notification.
 @MainActor
-final class NotificationManager: ObservableObject {
+@Observable
+final class NotificationManager {
 
     static let shared = NotificationManager()
 
@@ -50,7 +51,7 @@ final class NotificationManager: ObservableObject {
     static let resetDefaultsKey = "notify.reset.enabled"
 
     /// Master on/off switch for all usage alerts.
-    @Published var isEnabled: Bool {
+    var isEnabled: Bool {
         didSet {
             guard didLoad else { return }
             defaults.set(isEnabled, forKey: Self.masterDefaultsKey)
@@ -60,7 +61,7 @@ final class NotificationManager: ObservableObject {
 
     /// Whether to announce when a tracked limit resets (only for windows that
     /// had any usage). Defaults to on.
-    @Published var resetAlertsEnabled: Bool {
+    var resetAlertsEnabled: Bool {
         didSet {
             guard didLoad else { return }
             defaults.set(resetAlertsEnabled, forKey: Self.resetDefaultsKey)
@@ -68,17 +69,17 @@ final class NotificationManager: ObservableObject {
     }
 
     /// Per-threshold enablement. Defaults to on for every threshold.
-    @Published private var thresholdEnabled: [Int: Bool]
+    private var thresholdEnabled: [Int: Bool]
 
     /// True when the OS has explicitly denied notification permission, so the
     /// menu can nudge the user toward System Settings.
-    @Published private(set) var permissionDenied: Bool = false
+    private(set) var permissionDenied: Bool = false
 
     // MARK: - Internals
 
     private let defaults: UserDefaults
     private let center = UNUserNotificationCenter.current()
-    private var didLoad = false
+    @ObservationIgnored private var didLoad = false
 
     /// Per-metric record of which thresholds have already fired in the current
     /// quota window (keyed by `UsageMetric.Kind.rawValue`).
@@ -86,17 +87,17 @@ final class NotificationManager: ObservableObject {
         var signature: String      // identifies the quota window (reset date)
         var fired: Set<Int>        // threshold rawValues already notified
     }
-    private var firedState: [String: FiredEntry]
+    @ObservationIgnored private var firedState: [String: FiredEntry]
 
     /// Per-metric reset-alert state (keyed by `UsageMetric.Kind.rawValue`).
     /// Intentionally in-memory only: it resets on launch so a reset that
     /// happened while the app was closed can't fire a stale banner. See
     /// `UsageAlertPolicy.ResetWindowState`.
-    private var resetState: [String: UsageAlertPolicy.ResetWindowState] = [:]
+    @ObservationIgnored private var resetState: [String: UsageAlertPolicy.ResetWindowState] = [:]
 
     /// Last display label seen per metric, so a reset banner for a limit that
     /// has dropped out of the report still names the right model.
-    private var resetLabels: [String: String] = [:]
+    @ObservationIgnored private var resetLabels: [String: String] = [:]
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -124,17 +125,18 @@ final class NotificationManager: ObservableObject {
 
     // MARK: - Per-threshold access (for SwiftUI bindings)
 
-    func isThresholdEnabled(_ threshold: Threshold) -> Bool {
-        thresholdEnabled[threshold.rawValue] ?? true
-    }
-
-    func setThreshold(_ threshold: Threshold, enabled: Bool) {
-        thresholdEnabled[threshold.rawValue] = enabled
-        defaults.set(enabled, forKey: threshold.defaultsKey)
+    /// Whether a threshold alerts, persisted per threshold. A subscript so
+    /// views can bind to it by KeyPath: `$notifications[thresholdEnabled: t]`.
+    subscript(thresholdEnabled threshold: Threshold) -> Bool {
+        get { thresholdEnabled[threshold.rawValue] ?? true }
+        set {
+            thresholdEnabled[threshold.rawValue] = newValue
+            defaults.set(newValue, forKey: threshold.defaultsKey)
+        }
     }
 
     private var enabledThresholds: Set<Threshold> {
-        Set(Threshold.allCases.filter { isThresholdEnabled($0) })
+        Set(Threshold.allCases.filter { self[thresholdEnabled: $0] })
     }
 
     // MARK: - Evaluation

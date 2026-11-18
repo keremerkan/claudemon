@@ -10,20 +10,21 @@ final class UsageStorePrimingTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private var tempDir: URL!
+    /// XCTest creates a fresh instance per test, so each test gets its own
+    /// directory. A `let` (not main-actor state) so the nonisolated
+    /// setUp/tearDown overrides can read it.
+    private let tempDir = FileManager.default.temporaryDirectory
+        .appendingPathComponent("claudemon-store-tests-\(UUID().uuidString)", isDirectory: true)
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("claudemon-store-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
     }
 
     override func tearDownWithError() throws {
-        if let tempDir, FileManager.default.fileExists(atPath: tempDir.path) {
+        if FileManager.default.fileExists(atPath: tempDir.path) {
             try FileManager.default.removeItem(at: tempDir)
         }
-        tempDir = nil
         try super.tearDownWithError()
     }
 

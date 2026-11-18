@@ -4,10 +4,10 @@ import ClaudemonCore
 
 /// Rich panel shown when the menu-bar item is clicked.
 struct MenuPanelView: View {
-    @ObservedObject var store: UsageStore
-    @ObservedObject var loginItem: LoginItemManager
-    @ObservedObject var notifications: NotificationManager
-    @ObservedObject var updateChecker: UpdateChecker
+    @Bindable var store: UsageStore
+    @Bindable var loginItem: LoginItemManager
+    @Bindable var notifications: NotificationManager
+    let updateChecker: UpdateChecker
 
     @State private var showSettings = false
 
@@ -187,10 +187,8 @@ struct MenuPanelView: View {
             if notifications.isEnabled {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(NotificationManager.Threshold.allCases, id: \.rawValue) { threshold in
-                        Toggle(threshold.settingsLabel, isOn: Binding(
-                            get: { notifications.isThresholdEnabled(threshold) },
-                            set: { notifications.setThreshold(threshold, enabled: $0) }
-                        ))
+                        Toggle(threshold.settingsLabel,
+                               isOn: $notifications[thresholdEnabled: threshold])
                         .toggleStyle(.checkbox)
                         .controlSize(.small)
                         .font(.caption)
@@ -460,11 +458,16 @@ struct MetricRow: View {
     let metric: UsageMetric
     let preciseBar: Bool
 
-    @State private var now: Date = Date()
-    private let ticker = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        // Re-render every 30s so the "resets in" countdown stays current.
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            content(now: context.date)
+        }
+    }
+
+    private func content(now: Date) -> some View {
+        let resetDescription = resetDescription(now: now)
+        return VStack(alignment: .leading, spacing: 5) {
             HStack {
                 Text(metric.displayLabel)
                     .font(.subheadline.weight(.medium))
@@ -490,10 +493,9 @@ struct MetricRow: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(metric.displayLabel), \(metric.percent) percent used. \(resetDescription)")
-        .onReceive(ticker) { now = $0 }
     }
 
-    private var resetDescription: String {
+    private func resetDescription(now: Date) -> String {
         let countdown = UsageFormatting.countdownString(to: metric.resetDate, now: now)
         let absolute = UsageFormatting.absoluteResetString(date: metric.resetDate, timezone: metric.timezone)
         switch (countdown, absolute) {

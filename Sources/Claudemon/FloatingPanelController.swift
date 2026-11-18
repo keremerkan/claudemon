@@ -91,7 +91,7 @@ final class FloatingPanelController {
     }
 
     @objc private func handleDoubleClick() {
-        // Toggling drives both the SwiftUI re-render (@Published) and, via the
+        // Toggling drives both the SwiftUI re-render (@Observable) and, via the
         // store's change callback, this controller's panel resize.
         store.floatingCompact.toggle()
     }

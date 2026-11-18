@@ -13,7 +13,7 @@ struct FloatingWidgetView: View {
     static let largeContentSize = CGSize(width: 210, height: 112)
     static let miniContentSize = CGSize(width: 88, height: 88)
 
-    @ObservedObject var store: UsageStore
+    let store: UsageStore
 
     private var showOnboarding: Bool {
         !hasData && (store.isNotInstalled || store.isNotSignedIn)
@@ -56,12 +56,7 @@ struct FloatingWidgetView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .frame(width: Self.largeContentSize.width, height: Self.largeContentSize.height)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Color.primary.opacity(0.08))
-        )
+        .panelChrome(size: Self.largeContentSize)
     }
 
     // MARK: - Mini form
@@ -70,12 +65,7 @@ struct FloatingWidgetView: View {
     /// Reuses the exact ring rendering/colors of the large form.
     private var miniBody: some View {
         ringView(diameter: 69, lineWidth: 7, percentFont: 18, labelFont: 8)
-            .frame(width: Self.miniContentSize.width, height: Self.miniContentSize.height)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.primary.opacity(0.08))
-            )
+            .panelChrome(size: Self.miniContentSize)
     }
 
     // MARK: - Onboarding (calm)
@@ -237,5 +227,18 @@ struct FloatingWidgetView: View {
             summary += ", \(primary.shortLabel.lowercased()) \(resetHint)"
         }
         return summary
+    }
+}
+
+private extension View {
+    /// The floating panel's fixed size, frosted rounded background and
+    /// hairline border, shared by the large and mini forms.
+    func panelChrome(size: CGSize) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 16)
+        return frame(width: size.width, height: size.height)
+            .background(.ultraThinMaterial, in: shape)
+            .overlay {
+                shape.strokeBorder(Color.primary.opacity(0.08))
+            }
     }
 }

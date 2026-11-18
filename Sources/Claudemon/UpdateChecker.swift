@@ -12,7 +12,8 @@ private let updateLog = Logger(subsystem: "com.claudemon.app", category: "Update
 /// needs no entitlement. We never auto-download — we only surface a calm hint
 /// and let Homebrew do the upgrade.
 @MainActor
-final class UpdateChecker: ObservableObject {
+@Observable
+final class UpdateChecker {
 
     /// The state machine driving the footer UI. Calm, non-alarming by design.
     enum State: Equatable {
@@ -23,7 +24,7 @@ final class UpdateChecker: ObservableObject {
         case failed(String)
     }
 
-    @Published private(set) var state: State = .idle
+    private(set) var state: State = .idle
 
     private static let latestReleaseEndpoint =
         "https://api.github.com/repos/keremerkan/claudemon/releases/latest"

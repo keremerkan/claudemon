@@ -1,5 +1,4 @@
 import Foundation
-import Combine
 import SwiftUI
 import WidgetKit
 import ClaudemonCore
@@ -8,7 +7,8 @@ import ClaudemonCore
 /// performs an immediate refresh on launch, runs the subprocess off the main
 /// thread, parses, and publishes state to all observing surfaces.
 @MainActor
-final class UsageStore: ObservableObject {
+@Observable
+final class UsageStore {
 
     enum State: Equatable {
         case loading                          // first load in progress, no data yet
@@ -26,16 +26,16 @@ final class UsageStore: ObservableObject {
         case other(String)  // any other genuine error (timeout, launch, etc.)
     }
 
-    @Published private(set) var state: State = .loading
+    private(set) var state: State = .loading
     /// Timestamp of the last SUCCESSFUL capture (the data currently shown).
-    @Published private(set) var lastUpdated: Date?
-    @Published private(set) var isRefreshing: Bool = false
+    private(set) var lastUpdated: Date?
+    private(set) var isRefreshing: Bool = false
     /// The current classified diagnostic, if the latest poll genuinely failed.
     /// nil while loading, fresh, or in a calm stale-render.
-    @Published private(set) var diagnostic: Diagnostic?
+    private(set) var diagnostic: Diagnostic?
 
     /// Whether the floating widget is shown. Persisted in UserDefaults.
-    @Published var floatingEnabled: Bool {
+    var floatingEnabled: Bool {
         didSet {
             UserDefaults.standard.set(floatingEnabled, forKey: Self.floatingDefaultsKey)
             floatingChange?(floatingEnabled)
@@ -43,12 +43,12 @@ final class UsageStore: ObservableObject {
     }
 
     /// Callback fired when the floating toggle changes (wired by the app).
-    var floatingChange: ((Bool) -> Void)?
+    @ObservationIgnored var floatingChange: ((Bool) -> Void)?
 
     /// Whether the floating widget shows the compact (mini) form rather than the
     /// full form. Persisted in UserDefaults and toggled by a double-click on the
     /// panel.
-    @Published var floatingCompact: Bool {
+    var floatingCompact: Bool {
         didSet {
             UserDefaults.standard.set(floatingCompact, forKey: Self.floatingCompactKey)
             floatingCompactChange?(floatingCompact)
@@ -57,11 +57,11 @@ final class UsageStore: ObservableObject {
 
     /// Callback fired when the compact form toggles (wired by the panel
     /// controller so it can resize the panel).
-    var floatingCompactChange: ((Bool) -> Void)?
+    @ObservationIgnored var floatingCompactChange: ((Bool) -> Void)?
 
     /// How the menu-bar label presents the session percent. Persisted as the
     /// case's rawValue. Defaults to `.iconAndText`.
-    @Published var menuBarDisplayMode: MenuBarDisplayMode {
+    var menuBarDisplayMode: MenuBarDisplayMode {
         didSet {
             UserDefaults.standard.set(menuBarDisplayMode.rawValue, forKey: Self.menuBarDisplayModeKey)
         }
@@ -72,35 +72,35 @@ final class UsageStore: ObservableObject {
 
     /// Show the weekly (all models) limit as a second bar under/next to the
     /// session bar.
-    @Published var menuBarShowsWeekBar: Bool {
+    var menuBarShowsWeekBar: Bool {
         didSet {
             UserDefaults.standard.set(menuBarShowsWeekBar, forKey: Self.menuBarShowsWeekBarKey)
         }
     }
 
     /// Which weekly limit the second bar tracks (all models vs. per model).
-    @Published var menuBarWeekBarSource: MenuBarWeekBarSource {
+    var menuBarWeekBarSource: MenuBarWeekBarSource {
         didSet {
             UserDefaults.standard.set(menuBarWeekBarSource.rawValue, forKey: Self.menuBarWeekBarSourceKey)
         }
     }
 
     /// Show the percent value(s) beside the bar(s).
-    @Published var menuBarShowsPercent: Bool {
+    var menuBarShowsPercent: Bool {
         didSet {
             UserDefaults.standard.set(menuBarShowsPercent, forKey: Self.menuBarShowsPercentKey)
         }
     }
 
     /// Use vertical (bottom-up) bars instead of horizontal ones.
-    @Published var menuBarBarsVertical: Bool {
+    var menuBarBarsVertical: Bool {
         didSet {
             UserDefaults.standard.set(menuBarBarsVertical, forKey: Self.menuBarBarsVerticalKey)
         }
     }
 
     /// Horizontal bars at half the standard width (ignored in vertical mode).
-    @Published var menuBarBarsHalfWidth: Bool {
+    var menuBarBarsHalfWidth: Bool {
         didSet {
             UserDefaults.standard.set(menuBarBarsHalfWidth, forKey: Self.menuBarBarsHalfWidthKey)
         }
@@ -111,7 +111,7 @@ final class UsageStore: ObservableObject {
     /// Persisted in the App Group defaults suite — not standard defaults — so
     /// the widget process sees it too; a direct reload nudges the widget to
     /// redraw promptly instead of waiting out its ~15-minute timeline policy.
-    @Published var preciseBars: Bool {
+    var preciseBars: Bool {
         didSet {
             PreciseBarsPreference.write(preciseBars)
             WidgetCenter.shared.reloadTimelines(ofKind: claudemonWidgetKind)
@@ -127,8 +127,8 @@ final class UsageStore: ObservableObject {
     static let menuBarBarsVerticalKey = "menuBarBarsVertical"
     static let menuBarBarsHalfWidthKey = "menuBarBarsHalfWidth"
     private let pollInterval: TimeInterval = 60
-    private var timer: Timer?
-    private var currentTask: Task<Void, Never>?
+    @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var currentTask: Task<Void, Never>?
 
     // Accelerated follow-up after a stale-render miss. The `claude` CLI refreshes
     // its limit lines on a ~1-minute internal cadence and returns a local-only
@@ -137,8 +137,8 @@ final class UsageStore: ObservableObject {
     // capped to a couple in a row, then fall back to the normal 60s cadence.
     private let acceleratedInterval: TimeInterval = 28
     private let maxAcceleratedPolls = 2
-    private var acceleratedPollsRemaining = 0
-    private var followUpWork: DispatchWorkItem?
+    @ObservationIgnored private var acceleratedPollsRemaining = 0
+    @ObservationIgnored private var followUpTask: Task<Void, Never>?
 
     // Cold-start escalation. On a fresh launch with no last-good report, a
     // no-metrics body keeps us calmly in `.loading`. But if EVERY poll returns
@@ -147,7 +147,7 @@ final class UsageStore: ObservableObject {
     // misses (no last-good) and, past a threshold, surface a gentle, recoverable
     // error instead. Any success or genuine failure resets the counter.
     private let maxColdNoMetrics = 5
-    private var consecutiveColdNoMetrics = 0
+    @ObservationIgnored private var consecutiveColdNoMetrics = 0
     // Wall-clock floor for cold escalation. The cold-miss count alone couples to
     // the accelerated-poll cadence (it can reach the threshold in ~88s), which
     // could falsely escalate a slow-but-healthy first load (the CLI refreshes its
@@ -155,15 +155,15 @@ final class UsageStore: ObservableObject {
     // since polling began before surfacing a recoverable error. Fully
     // recoverable: a later applySuccess still clears state/diagnostic/counter.
     private let minColdEscalationDelay: TimeInterval = 120
-    private var startedAt: Date?
+    @ObservationIgnored private var startedAt: Date?
 
     // Widget reload rate-limiting. Apple throttles widget reloads (~40-70/day),
     // so we only reload when the data meaningfully changed OR at most every 15
     // minutes. The menu bar / floating panel stay genuinely live regardless.
     private let cache: SharedUsageCache
     private let minReloadInterval: TimeInterval = 15 * 60
-    private var lastReloadAt: Date?
-    private var lastReloadedSnapshot: [UsageMetric.Kind: Int] = [:]
+    @ObservationIgnored private var lastReloadAt: Date?
+    @ObservationIgnored private var lastReloadedSnapshot: [UsageMetric.Kind: Int] = [:]
 
     /// `cache` is injectable so tests can verify launch priming against a
     /// temp-directory cache without the App Group entitlement. Production uses
@@ -231,8 +231,8 @@ final class UsageStore: ObservableObject {
         timer = nil
         currentTask?.cancel()
         currentTask = nil
-        followUpWork?.cancel()
-        followUpWork = nil
+        followUpTask?.cancel()
+        followUpTask = nil
         acceleratedPollsRemaining = 0
         // Reset the cold-miss counter so a refresh cancelled mid-flight can't
         // leave a stray increment that carries across a sleep/wake cycle.
@@ -286,8 +286,8 @@ final class UsageStore: ObservableObject {
         // A genuine hit: cancel any accelerated follow-up and resume normal pace.
         acceleratedPollsRemaining = 0
         consecutiveColdNoMetrics = 0
-        followUpWork?.cancel()
-        followUpWork = nil
+        followUpTask?.cancel()
+        followUpTask = nil
 
         state = .loaded(report)
         diagnostic = nil
@@ -395,12 +395,14 @@ final class UsageStore: ObservableObject {
             acceleratedPollsRemaining -= 1
             guard acceleratedPollsRemaining > 0 else { return }
         }
-        followUpWork?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            Task { @MainActor in self?.refresh() }
+        followUpTask?.cancel()
+        followUpTask = Task { [weak self, acceleratedInterval] in
+            // Cancellation (a hit, stop(), or a newer follow-up) ends the
+            // sleep early; that is the expected way out, not an error.
+            try? await Task.sleep(for: .seconds(acceleratedInterval))
+            guard !Task.isCancelled else { return }
+            self?.refresh()
         }
-        followUpWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + acceleratedInterval, execute: work)
     }
 
     /// Reload the widget timeline only if a percent changed or it has been at

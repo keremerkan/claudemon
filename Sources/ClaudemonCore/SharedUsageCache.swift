@@ -59,7 +59,7 @@ public struct CachedUsage: Codable, Sendable {
 
 /// Reads/writes the latest `UsageReport` (as JSON) into the App Group container
 /// so the network-free widget can read it. The app writes; the widget reads.
-public struct SharedUsageCache {
+public struct SharedUsageCache: Sendable {
 
     public static let shared = SharedUsageCache()
 
