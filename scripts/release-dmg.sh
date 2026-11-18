@@ -14,7 +14,7 @@
 #
 # Requirements (already set up on the build machine):
 #   - Developer ID Application identity in the keychain (team GH4CGS3B5H)
-#   - A notarytool keychain profile (default name: "claudemon")
+#   - A notarytool keychain profile (default name: "claudemon-notary")
 #
 set -euo pipefail
 
@@ -26,7 +26,7 @@ CONFIG="Release"
 
 DEV_ID="Developer ID Application: AKE Software GmbH (GH4CGS3B5H)"
 TEAM_ID="GH4CGS3B5H"
-NOTARY_PROFILE="${NOTARY_PROFILE:-claudemon}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-claudemon-notary}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"

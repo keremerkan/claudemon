@@ -48,7 +48,7 @@ jobs:
       - name: Checkout tap
         uses: actions/checkout@v4
         with:
-          repository: ardabalkandev/homebrew-tap
+          repository: keremerkan/homebrew-tap
           token: ${{ secrets.TAP_REPO_TOKEN }}
           path: tap
 

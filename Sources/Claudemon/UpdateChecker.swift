@@ -26,7 +26,7 @@ final class UpdateChecker: ObservableObject {
     @Published private(set) var state: State = .idle
 
     private static let latestReleaseEndpoint =
-        "https://api.github.com/repos/ardabalkandev/claudemon/releases/latest"
+        "https://api.github.com/repos/keremerkan/claudemon/releases/latest"
 
     /// The running app's marketing version (e.g. "1.1.2"). Falls back to "0"
     /// when no Info.plist is embedded (e.g. plain `swift build` CLI runs).

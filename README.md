@@ -132,18 +132,18 @@ but not signed in, the panel tells you to run `claude` in a terminal and use
 ### Homebrew (recommended)
 
 ```sh
-brew install --cask ardabalkandev/tap/claudemon
+brew install --cask keremerkan/tap/claudemon
 ```
 
-This taps [`ardabalkandev/homebrew-tap`](https://github.com/ardabalkandev/homebrew-tap)
+This taps [`keremerkan/homebrew-tap`](https://github.com/keremerkan/homebrew-tap)
 and installs the same Developer ID signed + notarized app. Update later with
 `brew upgrade --cask claudemon`, or remove it completely with
 `brew uninstall --zap --cask claudemon`.
 
 > **Note:** From Homebrew 5.2.0/6.0.0 onward (whichever comes first), third-party
 > taps require explicit trust. The fully-qualified command above is unaffected and
-> keeps working with no extra steps. If you prefer the `brew tap ardabalkandev/tap`
-> + short-name workflow, run `brew trust --cask ardabalkandev/tap/claudemon` first.
+> keeps working with no extra steps. If you prefer the `brew tap keremerkan/tap`
+> + short-name workflow, run `brew trust --cask keremerkan/tap/claudemon` first.
 > See [Tap Trust](https://docs.brew.sh/Tap-Trust) for details.
 
 ### Manual (DMG)
@@ -286,7 +286,7 @@ Prerequisites on the build machine:
 
 - A **paid Apple Developer account**.
 - A **Developer ID Application** certificate in the keychain.
-- A `notarytool` keychain profile named **`claudemon`**. (Override it with
+- A `notarytool` keychain profile named **`claudemon-notary`**. (Override it with
   `NOTARY_PROFILE=<name> ./scripts/release-dmg.sh`.) No secrets are stored in
   this repo — the script references the profile by name only.
 
@@ -322,4 +322,4 @@ trademarks of Anthropic. Claudemon simply reads the output of the official
 ## License
 
 Claudemon is released under the [MIT License](LICENSE). Copyright (c) 2026
-Arda Balkan.
+Arda Balkan and Kerem Erkan.
