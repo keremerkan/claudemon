@@ -294,7 +294,9 @@ swift test    # runs the Swift Testing suite (currently 80 tests, 113 cases)
 The pipeline:
 
 1. `xcodebuild` Release from `Claudemon.xcodeproj` (codesigning is **off** at build
-   time, so no provisioning profile is needed during the build).
+   time, so no provisioning profile is needed during the build), then check
+   that the app and the widget carry the same version and build (both are set
+   per target, so bump both).
 2. Sign inside-out with the **Developer ID Application** identity, **Hardened
    Runtime** (`--options runtime`) and a secure `--timestamp`, applying each
    target's entitlements: framework → widget appex → app.

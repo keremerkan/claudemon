@@ -62,6 +62,23 @@ xcodebuild \
 [[ -d "${APP_BUNDLE}" ]] || { echo "ERROR: app not found at ${APP_BUNDLE}" >&2; exit 1; }
 [[ -d "${APPEX}" ]] || { echo "ERROR: widget appex not embedded" >&2; exit 1; }
 
+# Version and build are set per target (Xcode's General tab writes them
+# there), so the app and the widget can drift apart. Apple expects an
+# extension's version to match its app's, and macOS only re-reads the widget
+# list when the widget's build number changes, so refuse a mismatch.
+bundle_version() {
+  local plist="$1/Contents/Info.plist"
+  echo "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${plist}") ($(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "${plist}"))"
+}
+APP_VERSION="$(bundle_version "${APP_BUNDLE}")"
+WIDGET_VERSION="$(bundle_version "${APPEX}")"
+if [[ "${APP_VERSION}" != "${WIDGET_VERSION}" ]]; then
+  echo "ERROR: app is ${APP_VERSION} but the widget is ${WIDGET_VERSION}." >&2
+  echo "       Set the same Version and Build on both the ${APP_NAME} and ${WIDGET_NAME} targets." >&2
+  exit 1
+fi
+log "Version ${APP_VERSION} (app and widget match)"
+
 # --- 2. Sign inside-out (Developer ID, hardened runtime, timestamp) ---------
 log "Signing framework"
 codesign --force --options runtime --timestamp \
