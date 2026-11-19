@@ -115,18 +115,22 @@ public struct UsageReport: Equatable, Codable, Sendable {
 // MARK: - Formatting helpers
 
 public enum UsageFormatting {
-    /// Returns a compact "Xh Ym" (or "Ym" / "now") countdown string from now
-    /// until the supplied reset date. Returns nil if no date.
+    /// Returns a compact "Xd Yh Zm" (a day or more left), "Yh Zm", "Zm" or
+    /// "now" countdown from now until the supplied reset date. Returns nil if
+    /// no date.
     public static func countdownString(to date: Date?, now: Date = Date()) -> String? {
         guard let date else { return nil }
         let interval = date.timeIntervalSince(now)
         if interval <= 0 { return "now" }
 
         let totalMinutes = Int(interval / 60.0)
-        let hours = totalMinutes / 60
+        let days = totalMinutes / (24 * 60)
+        let hours = totalMinutes % (24 * 60) / 60
         let minutes = totalMinutes % 60
 
-        if hours > 0 {
+        if days > 0 {
+            return "\(days)d \(hours)h \(minutes)m"
+        } else if hours > 0 {
             return "\(hours)h \(minutes)m"
         } else {
             return "\(minutes)m"

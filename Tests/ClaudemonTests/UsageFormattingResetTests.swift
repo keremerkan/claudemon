@@ -38,4 +38,24 @@ struct UsageFormattingResetTests {
                 == UsageFormatting.shortClockString(fixedDate)
         )
     }
+
+    // MARK: - Countdown
+
+    /// Seconds until the reset → the panel's "resets in …" countdown. Weekly
+    /// limits are days away, so 24 hours and up switch to days. (Typed up front:
+    /// the arithmetic in an untyped tuple literal is too slow to type-check.)
+    static let countdownCases: [(seconds: Int, expected: String)] = [
+        (-30, "now"), (0, "now"),
+        (59, "0m"), (5 * 60, "5m"),
+        (2 * 3600 + 5 * 60, "2h 5m"), (23 * 3600 + 59 * 60, "23h 59m"),
+        (24 * 3600, "1d 0h 0m"),
+        (165 * 3600 + 53 * 60, "6d 21h 53m"),
+    ]
+
+    @Test(arguments: countdownCases)
+    func `Countdown uses days once a day or more is left`(seconds: Int, expected: String) {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let reset = now.addingTimeInterval(TimeInterval(seconds))
+        #expect(UsageFormatting.countdownString(to: reset, now: now) == expected)
+    }
 }
