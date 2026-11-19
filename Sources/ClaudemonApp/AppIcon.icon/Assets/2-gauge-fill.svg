@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <!-- Gauge fill: the track's circle from its left end (225°) over the top to
-       57.7°, round ends. Centre (512.00, 558.60), radius 307.29, width 129.39.
-       The original is off-white #FDFAF8, i.e. white at about 96% opacity. -->
-  <path d="M 294.72 775.88 A 307.29 307.29 0 0 1 676.20 298.86" fill="none" stroke="#FFFFFF" stroke-width="129.39" stroke-linecap="round"/>
+  <!-- Gauge fill, full-ring variant: from the bottom (6 o'clock) clockwise over
+       the left and the top to 57.7°, where the needle points (212.3°, about 59%
+       of the ring). Round ends. Same circle as the track. -->
+  <path d="M 512.00 865.88 A 307.29 307.29 0 1 1 676.20 298.86" fill="none" stroke="#FFFFFF" stroke-width="129.39" stroke-linecap="round"/>
 </svg>

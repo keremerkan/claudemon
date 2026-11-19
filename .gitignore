@@ -13,3 +13,6 @@ DerivedData/
 .swiftpm/
 Package.resolved
 .wrongstack/
+
+# Local design sources (icon variants, traces); the shipping icon is Sources/ClaudemonApp/AppIcon.icon.
+Design/
