@@ -8,7 +8,7 @@ struct UsageEntry: TimelineEntry {
     let date: Date
     /// The cached report, or nil when no cache is available yet.
     let report: UsageReport?
-    /// When the cached data was captured (for the "as of" line).
+    /// When the shown data was captured (for the "updated" line).
     let capturedAt: Date?
     let isStale: Bool
     /// Exact straight-edged bar fills (app setting, shared via the App Group
@@ -52,7 +52,10 @@ struct UsageProvider: TimelineProvider {
         return UsageEntry(
             date: Date(),
             report: cached.report,
-            capturedAt: cached.report != nil ? cached.writtenAt : nil,
+            // The report's own capture time, not the cache write time: after
+            // a failed fetch the app rewrites the cache with the old report,
+            // and "last update" must name when that data was captured.
+            capturedAt: cached.report?.capturedAt,
             isStale: cached.state != .ok,
             preciseBars: precise,
             showsRemaining: remaining
@@ -75,8 +78,7 @@ struct ClaudemonWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: claudemonWidgetKind, provider: UsageProvider()) { entry in
             ClaudemonWidgetView(entry: entry)
-                .environment(\.showsRemainingUsage, entry.showsRemaining)
-                .containerBackground(.fill.tertiary, for: .widget)
+                .widgetChrome(entry)
         }
         .configurationDisplayName("Claude Usage")
         .description("Your Claude Code usage limits at a glance.")
@@ -84,9 +86,37 @@ struct ClaudemonWidget: Widget {
     }
 }
 
+/// The floating window's layout as a medium widget: a ring per limit.
+struct ClaudemonRingsWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: claudemonRingsWidgetKind, provider: UsageProvider()) { entry in
+            Group {
+                if let report = entry.report {
+                    RingsUsageView(report: report, capturedAt: entry.capturedAt, isStale: entry.isStale)
+                } else {
+                    EmptyUsageView()
+                }
+            }
+            .widgetChrome(entry)
+        }
+        .configurationDisplayName("Claude Usage Rings")
+        .description("Every usage limit as a ring, like the floating window.")
+        .supportedFamilies([.systemMedium])
+    }
+}
+
 @main
 struct ClaudemonWidgetBundle: WidgetBundle {
     var body: some Widget {
         ClaudemonWidget()
+        ClaudemonRingsWidget()
+    }
+}
+
+private extension View {
+    /// The app's display settings plus the standard widget background.
+    func widgetChrome(_ entry: UsageEntry) -> some View {
+        environment(\.showsRemainingUsage, entry.showsRemaining)
+            .containerBackground(.fill.tertiary, for: .widget)
     }
 }

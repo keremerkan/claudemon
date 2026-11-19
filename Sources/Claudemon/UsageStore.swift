@@ -134,7 +134,7 @@ final class UsageStore {
     var preciseBars: Bool {
         didSet {
             SharedPreference.preciseBars.write(preciseBars)
-            WidgetCenter.shared.reloadTimelines(ofKind: claudemonWidgetKind)
+            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 
@@ -144,7 +144,7 @@ final class UsageStore {
     var showsRemaining: Bool {
         didSet {
             SharedPreference.showsRemaining.write(showsRemaining)
-            WidgetCenter.shared.reloadTimelines(ofKind: claudemonWidgetKind)
+            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 
@@ -454,7 +454,7 @@ final class UsageStore {
 
         guard changed || elapsedEnough else { return }
 
-        WidgetCenter.shared.reloadTimelines(ofKind: claudemonWidgetKind)
+        WidgetCenter.shared.reloadAllTimelines()
         lastReloadAt = now
         lastReloadedSnapshot = snapshot
     }

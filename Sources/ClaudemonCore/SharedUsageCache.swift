@@ -15,8 +15,10 @@ private let sharedUsageCacheLogger = Logger(
 /// same container, otherwise the widget silently reads a divergent stale file.
 public let claudemonAppGroupID = "GH4CGS3B5H.group.com.claudemon.app"
 
-/// The widget kind string, shared so the app can request reloads by name.
+/// The widget kind strings. Kinds identify placed widgets, so never rename
+/// them: a placed widget whose kind disappears goes blank.
 public let claudemonWidgetKind = "ClaudemonWidget"
+public let claudemonRingsWidgetKind = "ClaudemonRingsWidget"
 
 /// A display preference shared between the app (writer) and the widget
 /// (reader) through the App Group defaults suite — the widget runs in its own

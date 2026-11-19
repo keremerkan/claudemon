@@ -144,6 +144,15 @@ public enum UsageFormatting {
         format(date, "HH:mm:ss", timeZone: nil)
     }
 
+    /// When a limit resets, in its own timezone: "resets at 14:00" for the
+    /// 5-hour session, "resets Nov 19" for a week. Nil without a reset date.
+    public static func resetHint(for metric: UsageMetric) -> String? {
+        guard let resetDate = metric.resetDate else { return nil }
+        return metric.kind == .session
+            ? "resets at " + shortClockString(resetDate, timeZone: metric.timezone)
+            : "resets " + shortDateString(resetDate, timeZone: metric.timezone)
+    }
+
     /// "MMM d" date (e.g. "Nov 19") in the supplied timezone, used for weekly
     /// reset hints where a clock time alone would be ambiguous.
     public static func shortDateString(_ date: Date, timeZone: TimeZone?) -> String {

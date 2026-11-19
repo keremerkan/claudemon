@@ -63,7 +63,10 @@ struct FloatingWidgetView: View {
     /// A single, larger ring centered in a compact rounded-square panel.
     /// Reuses the exact ring rendering/colors of the large form.
     private var miniBody: some View {
-        gauge(for: primary, diameter: 69)
+        UsageRingGauge(percent: primary?.percent,
+                       caption: primary?.shortLabel ?? UsageMetric.Kind.session.shortName,
+                       placeholderSymbol: placeholderSymbol)
+            .frame(width: 69, height: 69)
             .panelChrome(size: Self.miniContentSize)
     }
 
@@ -91,40 +94,21 @@ struct FloatingWidgetView: View {
 
     // MARK: - Rings
 
-    /// Room for the rings: the large form's width minus its horizontal
-    /// padding; the height left above the footer caps a ring at 65pt.
-    private static let ringsWidth = largeContentSize.width - 28
-    private static let maxRingDiameter: CGFloat = 65
-    private static let ringSpacing: CGFloat = 12
+    /// The rings' height in the large form: the most a ring may be, which also
+    /// leaves room for the footer.
+    private static let ringsHeight: CGFloat = 65
 
-    /// One ring per limit, primary first. Before any data arrives, a single
-    /// placeholder ring.
+    /// One ring per limit, primary first (two fit at full size; three share
+    /// the width). Before any data arrives, a single placeholder ring.
     private var rings: some View {
-        let metrics = store.lastGoodReport.map { report in
-            [report.primary].compactMap { $0 } + report.secondary
-        } ?? []
-        let count = CGFloat(max(metrics.count, 1))
-        // Two rings fit at full size; three share the same width.
-        let diameter = min(Self.maxRingDiameter,
-                           (Self.ringsWidth - (count - 1) * Self.ringSpacing) / count)
-        return HStack(spacing: Self.ringSpacing) {
-            if metrics.isEmpty {
-                gauge(for: nil, diameter: diameter)
-            } else {
-                ForEach(metrics) { gauge(for: $0, diameter: diameter) }
-            }
-        }
-        .frame(maxWidth: .infinity)
+        UsageRingRow(report: store.lastGoodReport, spacing: 12, maxDiameter: Self.ringsHeight,
+                     placeholderSymbol: placeholderSymbol)
+            .frame(height: Self.ringsHeight)
     }
 
-    /// The shared ring gauge for a limit; nil shows the waiting/error state.
-    private func gauge(for metric: UsageMetric?, diameter: CGFloat) -> some View {
-        UsageRingGauge(
-            percent: metric?.percent,
-            caption: metric?.shortLabel ?? UsageMetric.Kind.session.shortName,
-            diameter: diameter,
-            placeholderSymbol: store.errorMessage != nil ? "exclamationmark.triangle" : "ellipsis"
-        )
+    /// The waiting/error symbol for a ring without data.
+    private var placeholderSymbol: String {
+        store.errorMessage != nil ? "exclamationmark.triangle" : "ellipsis"
     }
 
     // MARK: - Footer
@@ -174,13 +158,9 @@ struct FloatingWidgetView: View {
         return prefix + UsageFormatting.shortClockString(updated) + resetSuffix + staleHint
     }
 
-    /// When the primary limit resets, in its own timezone: "resets at HH:mm"
-    /// for the 5-hour session, "resets Nov 19" for a week. Nil without a date.
+    /// When the primary limit resets (see `UsageFormatting.resetHint`).
     private var resetHint: String? {
-        guard let primary, let resetDate = primary.resetDate else { return nil }
-        return primary.kind == .session
-            ? "resets at " + UsageFormatting.shortClockString(resetDate, timeZone: primary.timezone)
-            : "resets " + UsageFormatting.shortDateString(resetDate, timeZone: primary.timezone)
+        primary.flatMap(UsageFormatting.resetHint(for:))
     }
 
     private var accessibilitySummary: String {

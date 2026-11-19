@@ -139,29 +139,35 @@ public struct UsageRing: View {
 }
 
 /// A `UsageRing` with its shown percent over a caption inside ("73%" over
-/// "WEEK"), everything scaled from `diameter`. Shared by the floating window
-/// and the small widget. A nil percent (no data yet) shows `placeholderSymbol`
-/// in an empty ring.
+/// "WEEK"), everything scaled to the largest square that fits the space it is
+/// given (set a frame for a fixed size). Shared by the floating window and the
+/// widgets. A nil percent (no data yet) shows `placeholderSymbol` in an empty
+/// ring.
 public struct UsageRingGauge: View {
     /// The limit's USED percentage, or nil without data.
     private let percent: Int?
     private let caption: String
-    private let diameter: CGFloat
     private let placeholderSymbol: String
     @Environment(\.showsRemainingUsage) private var showsRemaining
 
-    public init(percent: Int?, caption: String, diameter: CGFloat,
-                placeholderSymbol: String = "ellipsis") {
+    public init(percent: Int?, caption: String, placeholderSymbol: String = "ellipsis") {
         self.percent = percent
         self.caption = caption
-        self.diameter = diameter
         self.placeholderSymbol = placeholderSymbol
     }
 
     public var body: some View {
+        GeometryReader { geo in
+            gauge(diameter: min(geo.size.width, geo.size.height))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .aspectRatio(1, contentMode: .fit)
+    }
+
+    private func gauge(diameter: CGFloat) -> some View {
         let lineWidth = max(diameter * 0.105, 4)
         let percentFont = diameter * 0.24
-        ZStack {
+        return ZStack {
             UsageRing(percent: percent, lineWidth: lineWidth)
             VStack(spacing: 1) {
                 if let percent {
@@ -185,5 +191,73 @@ public struct UsageRingGauge: View {
             .frame(maxWidth: (diameter - 2 * lineWidth) * 0.78)
         }
         .frame(width: diameter, height: diameter)
+    }
+}
+
+/// A `UsageRingGauge` for every limit in `report`, the primary first (see
+/// `UsageReport.primary` and `.secondary`), as large as the available width
+/// and height allow (capped at `maxDiameter`). The row takes only the size it
+/// uses, so a parent can center it with whatever sits around it. Shared by
+/// the floating window and the rings widget. Without a report, one
+/// placeholder ring.
+public struct UsageRingRow: View {
+    private let report: UsageReport?
+    private let spacing: CGFloat
+    private let maxDiameter: CGFloat
+    private let placeholderSymbol: String
+
+    public init(report: UsageReport?, spacing: CGFloat, maxDiameter: CGFloat = .infinity,
+                placeholderSymbol: String = "ellipsis") {
+        self.report = report
+        self.spacing = spacing
+        self.maxDiameter = maxDiameter
+        self.placeholderSymbol = placeholderSymbol
+    }
+
+    public var body: some View {
+        let metrics = report.map { [$0.primary].compactMap { $0 } + $0.secondary } ?? []
+        SquareRowLayout(spacing: spacing, maxSide: maxDiameter) {
+            if metrics.isEmpty {
+                UsageRingGauge(percent: nil, caption: UsageMetric.Kind.session.shortName,
+                               placeholderSymbol: placeholderSymbol)
+            } else {
+                ForEach(metrics) { metric in
+                    UsageRingGauge(percent: metric.percent, caption: metric.shortLabel)
+                }
+            }
+        }
+    }
+}
+
+/// Equal squares in a centered row, each as large as the proposal allows
+/// (capped at `maxSide`). Reports exactly the size it uses rather than filling
+/// the proposal, unlike a GeometryReader.
+private struct SquareRowLayout: Layout {
+    let spacing: CGFloat
+    let maxSide: CGFloat
+
+    private func side(fitting size: ProposedViewSize, count: Int) -> CGFloat {
+        let n = CGFloat(max(count, 1))
+        let byWidth = size.width.map { ($0 - spacing * (n - 1)) / n } ?? .infinity
+        let side = min(maxSide, byWidth, size.height ?? .infinity)
+        // Unbounded proposal and no cap: fall back to a modest ideal size.
+        return side.isFinite ? max(0, side) : 60
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let side = side(fitting: proposal, count: subviews.count)
+        let n = CGFloat(subviews.count)
+        return CGSize(width: n * side + spacing * max(n - 1, 0), height: side)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let side = side(fitting: ProposedViewSize(bounds.size), count: subviews.count)
+        let n = CGFloat(subviews.count)
+        var x = bounds.midX - (n * side + spacing * max(n - 1, 0)) / 2
+        for subview in subviews {
+            subview.place(at: CGPoint(x: x, y: bounds.midY), anchor: .leading,
+                          proposal: ProposedViewSize(width: side, height: side))
+            x += side + spacing
+        }
     }
 }

@@ -335,7 +335,7 @@ struct MenuPanelView: View {
 
             settingSwitch("Floating widget", systemImage: "rectangle.on.rectangle", isOn: $store.floatingEnabled)
 
-            settingCaption("Prefer a desktop widget? Add \u{201C}Claude Usage\u{201D} from Notification Center.")
+            settingCaption("Prefer a desktop widget? Add \u{201C}Claude Usage\u{201D} or \u{201C}Claude Usage Rings\u{201D} from the widget gallery.")
 
             settingSwitch("Precise bar fill", systemImage: "ruler", isOn: $store.preciseBars)
 

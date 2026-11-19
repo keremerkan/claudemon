@@ -8,7 +8,7 @@ and surfaces them in three places:
   configurable style — icon + text, text only, or icon only),
 - an optional always-on-top **floating desktop window** with a ring per limit
   (double-click to toggle a **mini view** of just the main limit), and
-- a **Notification Center / desktop widget** (WidgetKit).
+- **Notification Center / desktop widgets** (WidgetKit).
 
 It tracks the three limits Claude Code reports — **Current Session (5h)**,
 **Current Week (all models)**, and a **per-model current-week limit** (the
@@ -39,7 +39,9 @@ the main one first, plus a reset footer) and a **mini view** that shows just
 the main limit's ring. **Double-click the floating window** to switch between
 them — the mini view is a smaller, glanceable indicator that stays out of the
 way; double-click again to return. The small desktop widget likewise shows
-only the main limit's ring; the medium one lists every limit.
+only the main limit's ring; the medium one lists every limit as bars, and a
+second medium widget, **Claude Usage Rings**, matches the floating window's
+full view.
 
 ## Menu bar style & settings
 
@@ -185,8 +187,9 @@ Because the app is notarized by Apple, it opens without a Gatekeeper warning. If
 macOS still complains (for example after copying it via an unusual route),
 **right-click the app → Open**, then confirm once.
 
-To add the widget, right-click the desktop or open Notification Center →
-**Edit Widgets**, find **Claude Usage**, and place it.
+To add a widget, right-click the desktop or open Notification Center →
+**Edit Widgets**, find **Claude Usage** (small or medium) or **Claude Usage
+Rings** (medium), and place it.
 
 ## How it works
 
@@ -235,9 +238,10 @@ container, so the widget will stay on its "Open Claudemon" prompt there.
 The widget is **best-effort fresh, not per-minute.** Apple throttles widget
 timeline reloads, so Claudemon rate-limits them and the widget's own timeline
 policy targets roughly every 15 minutes. The menu bar and floating window remain
-the genuinely live (60s) surfaces; the widget is a glance view that shows
-"as of HH:mm" from the cache timestamp (and an "Open Claudemon" prompt when the
-cache is empty).
+the genuinely live (60s) surfaces; the widgets are glance views that show
+"updated HH:mm" for when the shown data was captured ("last update HH:mm" in
+orange when the latest fetch failed), and an "Open Claudemon" prompt when the
+cache is empty.
 
 ## Build from source
 

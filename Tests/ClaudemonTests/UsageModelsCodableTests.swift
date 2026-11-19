@@ -179,4 +179,15 @@ struct UsageModelsCodableTests {
         #expect(UsageDisplay.spoken(27, remaining: false) == "27 percent used")
         #expect(UsageDisplay.spoken(27, remaining: true) == "73 percent left")
     }
+
+    @Test func `Reset hint names a clock time for sessions and a date for weeks`() {
+        let reset = makeDate(2026, 11, 26, 8, 59)
+        func metric(_ kind: UsageMetric.Kind) -> UsageMetric {
+            UsageMetric(kind: kind, rawLabel: "", percent: 0, resetDate: reset, timezoneIdentifier: "Europe/Istanbul")
+        }
+        #expect(UsageFormatting.resetHint(for: metric(.session)) == "resets at 08:59")
+        #expect(UsageFormatting.resetHint(for: metric(.weekAll)) == "resets Nov 26")
+        #expect(UsageFormatting.resetHint(for: UsageMetric(kind: .session, rawLabel: "", percent: 0,
+                                                           resetDate: nil, timezoneIdentifier: nil)) == nil)
+    }
 }

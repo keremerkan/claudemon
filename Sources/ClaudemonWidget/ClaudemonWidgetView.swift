@@ -37,49 +37,98 @@ struct SmallUsageView: View {
 
     @Environment(\.showsRemainingUsage) private var showsRemaining
 
-    /// Blank space a `.callout` line keeps below its baseline. The "as of"
-    /// line ends with it, so the ring gets the same inset on top and the
-    /// visible gaps to the top and bottom edges match.
-    private static let footerDescent = -NSFont.preferredFont(forTextStyle: .callout).descender
-
     var body: some View {
-        // The ring sits at the top edge and the "as of" line at the bottom
-        // edge, so both get the same widget content margin. The ring takes all
-        // the height the text doesn't need.
-        VStack(spacing: 0) {
+        RingsOverFooter {
             ring
-                .padding(.top, Self.footerDescent)
-                .layoutPriority(1)
-
-            footerLine
-                // Claim the text's full height up front. Without this the
-                // stack only reserves its minimumScaleFactor height, hands the
-                // rest to the ring, then draws full-size text and overflows.
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 8)
+        } footer: {
+            UpdatedText(capturedAt: capturedAt, isStale: isStale, font: .callout)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(primary.map {
             "\($0.shortLabel) \(UsageDisplay.spoken($0.percent, remaining: showsRemaining))"
         } ?? "No usage data")
     }
 
-    /// The shared ring gauge, scaled to fill the available square.
+    /// The shared ring gauge; it scales itself to the largest square that fits.
     private var ring: some View {
-        GeometryReader { geo in
-            UsageRingGauge(percent: primary?.percent,
-                           caption: primary?.shortLabel ?? UsageMetric.Kind.session.shortName,
-                           diameter: min(geo.size.width, geo.size.height))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        UsageRingGauge(percent: primary?.percent,
+                       caption: primary?.shortLabel ?? UsageMetric.Kind.session.shortName)
+    }
+}
+
+// MARK: - Medium: every limit as a ring (the floating window's layout)
+
+/// A ring per limit, the main one first, over an "updated · resets" line:
+/// the same layout and wording as the app's floating window.
+struct RingsUsageView: View {
+    let report: UsageReport
+    let capturedAt: Date?
+    let isStale: Bool
+
+    @Environment(\.showsRemainingUsage) private var showsRemaining
+
+    var body: some View {
+        RingsOverFooter {
+            UsageRingRow(report: report, spacing: 16)
+        } footer: {
+            UpdatedText(capturedAt: capturedAt, isStale: isStale,
+                        suffix: report.primary.flatMap(UsageFormatting.resetHint(for:)),
+                        font: .callout)
         }
-        .aspectRatio(1, contentMode: .fit)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(report.metrics
+            .map { "\($0.shortLabel) \(UsageDisplay.spoken($0.percent, remaining: showsRemaining))" }
+            .joined(separator: ", "))
+    }
+}
+
+// MARK: - Shared pieces
+
+/// Rings over a one-line footer, the rings taking all the height the footer
+/// doesn't need. When the rings are height-bound they sit flush with the top
+/// margin and the footer with the bottom; when width-bound (three rings) the
+/// pair is centered, so the top and bottom gaps match either way.
+private struct RingsOverFooter<Rings: View, Footer: View>: View {
+    @ViewBuilder let rings: Rings
+    @ViewBuilder let footer: Footer
+
+    /// Blank space a `.callout` line keeps below its baseline. The footer ends
+    /// with it, so the rings get the same inset on top and the visible gaps to
+    /// the top and bottom edges match.
+    private static var footerDescent: CGFloat {
+        -NSFont.preferredFont(forTextStyle: .callout).descender
     }
 
-    @ViewBuilder private var footerLine: some View {
+    var body: some View {
+        VStack(spacing: 0) {
+            rings
+                .padding(.top, Self.footerDescent)
+                .layoutPriority(1)
+
+            footer
+                // Claim the text's full height up front. Without this the
+                // stack only reserves its minimumScaleFactor height, hands the
+                // rest to the rings, then draws full-size text and overflows.
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 8)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// "updated 14:32" (plus an optional " · suffix"), or "last update 14:32" in
+/// orange when the app's latest fetch failed: the floating window's wording.
+private struct UpdatedText: View {
+    let capturedAt: Date?
+    let isStale: Bool
+    var suffix: String?
+    let font: Font
+
+    var body: some View {
         if let capturedAt {
-            Text("\(isStale ? "stale · " : "")as of \(UsageFormatting.shortClockString(capturedAt))")
-                .font(.callout)
+            let clock = UsageFormatting.shortClockString(capturedAt)
+            Text((isStale ? "last update " : "updated ") + clock + (suffix.map { " · " + $0 } ?? ""))
+                .font(font)
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
                 .foregroundStyle(isStale ? .orange : .secondary)
@@ -107,11 +156,7 @@ struct MediumUsageView: View {
                 Text("Claude Usage")
                     .font(.subheadline.weight(.semibold))
                 Spacer()
-                if let capturedAt {
-                    Text("\(isStale ? "stale · " : "")as of \(UsageFormatting.shortClockString(capturedAt))")
-                        .font(.caption2)
-                        .foregroundStyle(isStale ? .orange : .secondary)
-                }
+                UpdatedText(capturedAt: capturedAt, isStale: isStale, font: .caption2)
             }
 
             ForEach(report.metrics) { metric in
