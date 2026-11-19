@@ -2,6 +2,66 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-11-19
+
+Claudemon has a new maintainer: the repository moved to
+[keremerkan/claudemon](https://github.com/keremerkan/claudemon) and the app is
+now signed by AKE Software GmbH.
+
+### Added
+
+- Accounts without a session limit (Max plans no longer have one) are
+  detected from Claude Code's output: the session limit is hidden and a weekly
+  limit takes its place. A **Main limit** setting chooses which weekly limit
+  the menu bar shows first, and in the bar graph a **Second bar** option
+  (on by default) shows the other one.
+- **Show remaining** setting: every number, bar, ring and gauge counts down
+  from 100% (what's left) instead of up from 0%. Colors still follow usage.
+- **Claude Usage Rings**, a new medium desktop widget with the floating
+  window's layout: a ring for every limit.
+- A new Liquid Glass app icon.
+
+### Changed
+
+- The floating window shows a ring for every limit instead of one ring and
+  bars; its footer is centered.
+- The small desktop widget shows only the main limit's ring.
+- The desktop widgets say "updated HH:mm" (and "last update HH:mm" in orange
+  when the latest fetch failed), matching the floating window.
+- Reset countdowns of a day or more show days: "resets in 6d 21h 53m".
+- The gauge icon in the menu bar, the panel header and the medium widget
+  follows the main limit, in five steps instead of three.
+- Homebrew: the cask moved to `keremerkan/tap`. Install with
+  `brew install --cask keremerkan/tap/claudemon`.
+
+### Fixed
+
+- The menu bar showed "—" instead of usage when there was no session limit.
+- The limit-reset alert for a session fired only when the next session
+  started, not when the window ended.
+- Usage tips in newer Claude Code output could be misread as a usage limit.
+- A usage check could hang for good if a process Claude Code started kept its
+  output open; it now times out and retries.
+- "100%" touched the ring in the small widget and the floating window.
+- After a failed check, the widget showed the time of the failure as its
+  "last update" time instead of when the shown data was captured.
+
+### Upgrade notes
+
+- The new signature uses a new shared container, so **Precise bar fill**
+  starts off; turn it on again in Settings if you used it.
+- macOS may ask you to approve **Launch at login** again in System Settings →
+  General → Login Items.
+- If a desktop widget shows "Open Claudemon", open the app once.
+
+### Maintenance
+
+- Swift 6 language mode with `@Observable` models; the tests moved to Swift
+  Testing.
+- The Xcode project is maintained by hand (XcodeGen removed); version and
+  build are set per target, and the release script checks that the app and
+  widget versions match.
+
 ## [1.4.7] - 2026-09-10
 
 ### Added
