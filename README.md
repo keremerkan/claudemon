@@ -261,7 +261,7 @@ entitlements.
 
 ```bash
 swift build   # debug build of ClaudemonCore + the app
-swift test    # runs the unit test suite (currently 105 tests)
+swift test    # runs the Swift Testing suite (currently 80 tests, 113 cases)
 ```
 
 ## Release / signing (building the signed DMG)

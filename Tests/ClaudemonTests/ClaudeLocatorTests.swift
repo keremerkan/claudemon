@@ -1,19 +1,21 @@
-import XCTest
+import Foundation
+import Testing
 @testable import ClaudemonCore
 
 /// Tests for the process-free `claude` discovery used by the friend-failure fix.
-final class ClaudeLocatorTests: XCTestCase {
+struct ClaudeLocatorTests {
 
-    private var tempHome: URL!
+    private let tempHome: URL
+    /// Keeps the fake home alive (and removes it afterwards) for one test.
+    private let directory: TemporaryDirectory
 
-    override func setUpWithError() throws {
-        tempHome = FileManager.default.temporaryDirectory
-            .appendingPathComponent("claudemon-locator-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: tempHome, withIntermediateDirectories: true)
+    init() throws {
+        directory = try TemporaryDirectory(prefix: "claudemon-locator")
+        tempHome = directory.url
     }
 
-    override func tearDownWithError() throws {
-        if let tempHome { try? FileManager.default.removeItem(at: tempHome) }
+    private var locator: ClaudeLocator {
+        ClaudeLocator(homeDirectory: tempHome.path, systemPaths: [])
     }
 
     /// Create an executable stub at the given relative path under the fake home.
@@ -27,49 +29,42 @@ final class ClaudeLocatorTests: XCTestCase {
         return url.path
     }
 
-    func testFindsClaudeInNpmGlobalBin() throws {
+    /// Resolved (symlink-canonical) form of a path, so /var vs /private/var
+    /// temp-dir differences don't cause spurious failures.
+    private func resolved(_ path: String?) -> String? {
+        path.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path }
+    }
+
+    @Test func `Finds claude in npm-global bin`() throws {
         let expected = try makeExecutable(at: ".npm-global/bin/claude")
-        let locator = ClaudeLocator(homeDirectory: tempHome.path, systemPaths: [])
-        XCTAssertEqual(locator.locateFromFilesystem(), expected)
+        #expect(locator.locateFromFilesystem() == expected)
     }
 
-    func testFindsClaudeInPnpmDir() throws {
+    @Test func `Finds claude in pnpm dir`() throws {
         let expected = try makeExecutable(at: "Library/pnpm/claude")
-        let locator = ClaudeLocator(homeDirectory: tempHome.path, systemPaths: [])
-        XCTAssertEqual(locator.locateFromFilesystem(), expected)
+        #expect(locator.locateFromFilesystem() == expected)
     }
 
-    /// Compare paths by their resolved (symlink-canonical) form so /var vs
-    /// /private/var temp-dir differences don't cause spurious failures.
-    private func assertSamePath(_ a: String?, _ b: String, file: StaticString = #filePath, line: UInt = #line) {
-        let ra = a.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path }
-        let rb = URL(fileURLWithPath: b).resolvingSymlinksInPath().path
-        XCTAssertEqual(ra, rb, file: file, line: line)
-    }
-
-    func testFindsClaudeUnderNvmVersionGlob() throws {
+    @Test func `Finds claude under nvm version glob`() throws {
         // nvm layout: ~/.nvm/versions/node/<version>/bin/claude
         let expected = try makeExecutable(at: ".nvm/versions/node/v22.3.0/bin/claude")
-        let locator = ClaudeLocator(homeDirectory: tempHome.path, systemPaths: [])
-        assertSamePath(locator.firstClaudeUnderGlobRoots(), expected)
-        assertSamePath(locator.locateFromFilesystem(), expected)
+        #expect(resolved(locator.firstClaudeUnderGlobRoots()) == resolved(expected))
+        #expect(resolved(locator.locateFromFilesystem()) == resolved(expected))
     }
 
-    func testFindsClaudeUnderFnmNestedDir() throws {
+    @Test func `Finds claude under fnm nested dir`() throws {
         // fnm nests node installs a few levels deep.
         let expected = try makeExecutable(at: ".fnm/node-versions/v20.11.1/installation/bin/claude")
-        let locator = ClaudeLocator(homeDirectory: tempHome.path, systemPaths: [])
-        assertSamePath(locator.firstClaudeUnderGlobRoots(), expected)
+        #expect(resolved(locator.firstClaudeUnderGlobRoots()) == resolved(expected))
     }
 
-    func testReturnsNilWhenClaudeMissingEverywhere() throws {
+    @Test func `Returns nil when claude is missing everywhere`() {
         // Empty fake home, no claude anywhere the locator looks.
-        let locator = ClaudeLocator(homeDirectory: tempHome.path, systemPaths: [])
-        XCTAssertNil(locator.locateFromFilesystem(),
-                     "A totally-missing claude must not be located from the filesystem")
+        #expect(locator.locateFromFilesystem() == nil,
+                "A totally-missing claude must not be located from the filesystem")
     }
 
-    func testIgnoresNonExecutableNamedClaude() throws {
+    @Test func `Ignores a non-executable file named claude`() throws {
         // A plain (non-executable) file named claude should NOT match.
         let url = tempHome.appendingPathComponent(".npm-global/bin/claude")
         try FileManager.default.createDirectory(
@@ -77,7 +72,6 @@ final class ClaudeLocatorTests: XCTestCase {
         try "not executable".write(to: url, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url.path)
 
-        let locator = ClaudeLocator(homeDirectory: tempHome.path, systemPaths: [])
-        XCTAssertNil(locator.locateFromFilesystem())
+        #expect(locator.locateFromFilesystem() == nil)
     }
 }

@@ -1,115 +1,103 @@
-import XCTest
+import Foundation
+import Testing
 @testable import ClaudemonCore
 
 /// Unit tests for the pure value-level logic in `MenuBarMiniBar.swift`: the
 /// `MenuBarDisplayMode` enum that drives the menu-bar label presentation.
-final class MenuBarMiniBarTests: XCTestCase {
+struct MenuBarMiniBarTests {
 
-    // MARK: - MenuBarDisplayMode rawValue round-trip
+    // MARK: - MenuBarDisplayMode
 
-    func testDisplayModeRawValueRoundTrips() {
-        for mode in MenuBarDisplayMode.allCases {
-            XCTAssertEqual(
-                MenuBarDisplayMode(rawValue: mode.rawValue),
-                mode,
-                "rawValue round-trip must reconstruct the same case (persistence relies on this)"
-            )
-        }
+    @Test(arguments: MenuBarDisplayMode.allCases)
+    func `Display mode raw value round-trips and matches its id`(mode: MenuBarDisplayMode) {
+        #expect(MenuBarDisplayMode(rawValue: mode.rawValue) == mode,
+                "rawValue round-trip must reconstruct the same case (persistence relies on this)")
+        #expect(mode.id == mode.rawValue)
     }
 
-    func testDisplayModeRejectsUnknownRawValue() {
-        XCTAssertNil(MenuBarDisplayMode(rawValue: "notAMode"))
-        XCTAssertNil(MenuBarDisplayMode(rawValue: ""))
+    @Test func `Display mode rejects unknown raw values`() {
+        #expect(MenuBarDisplayMode(rawValue: "notAMode") == nil)
+        #expect(MenuBarDisplayMode(rawValue: "") == nil)
         // A removed/unknown rawValue must no longer resolve, so persisted old
         // bar values fall back to the default at the call site.
-        XCTAssertNil(MenuBarDisplayMode(rawValue: "removedLegacyMode"))
+        #expect(MenuBarDisplayMode(rawValue: "removedLegacyMode") == nil)
     }
 
-    func testDisplayModeIdMatchesRawValue() {
-        for mode in MenuBarDisplayMode.allCases {
-            XCTAssertEqual(mode.id, mode.rawValue)
-        }
-    }
-
-    // MARK: - MenuBarDisplayMode allCases count + order
-
-    func testDisplayModeCaseCountAndOrder() {
-        XCTAssertEqual(MenuBarDisplayMode.allCases.count, 4)
-        XCTAssertEqual(
-            MenuBarDisplayMode.allCases,
-            [.iconAndText, .textOnly, .iconOnly, .bars],
-            "Order is user-facing (drives the settings Picker) — pin it down"
-        )
+    @Test func `Display mode case order`() {
+        #expect(MenuBarDisplayMode.allCases == [.iconAndText, .textOnly, .iconOnly, .bars],
+                "Order is user-facing (drives the settings Picker) — pin it down")
     }
 
     // MARK: - MenuBarWeekBarSource
 
-    func testWeekBarSourceRawValueRoundTripsAndMapsToMetricKind() {
-        for source in MenuBarWeekBarSource.allCases {
-            XCTAssertEqual(MenuBarWeekBarSource(rawValue: source.rawValue), source)
-            XCTAssertEqual(source.id, source.rawValue)
-        }
-        XCTAssertNil(MenuBarWeekBarSource(rawValue: "sonnet"))
-        XCTAssertEqual(MenuBarWeekBarSource.allModels.metricKind, .weekAll)
-        XCTAssertEqual(MenuBarWeekBarSource.perModel.metricKind, .weekModel)
-        XCTAssertEqual(MenuBarWeekBarSource.allCases, [.allModels, .perModel],
-                       "Order is user-facing (drives the settings Picker)")
+    @Test(arguments: MenuBarWeekBarSource.allCases)
+    func `Week bar source raw value round-trips and matches its id`(source: MenuBarWeekBarSource) {
+        #expect(MenuBarWeekBarSource(rawValue: source.rawValue) == source)
+        #expect(source.id == source.rawValue)
+    }
+
+    @Test func `Week bar source maps to metric kinds in picker order`() {
+        #expect(MenuBarWeekBarSource(rawValue: "sonnet") == nil)
+        #expect(MenuBarWeekBarSource.allModels.metricKind == .weekAll)
+        #expect(MenuBarWeekBarSource.perModel.metricKind == .weekModel)
+        #expect(MenuBarWeekBarSource.allCases == [.allModels, .perModel],
+                "Order is user-facing (drives the settings Picker)")
     }
 
     // MARK: - MenuBarBarsView.Configuration
 
-    func testBarsConfigurationEquatableCoversAllFields() {
+    @Test func `Bars configuration equality covers every field`() {
         let base = MenuBarBarsView.Configuration(
             primaryPercent: 40, weekPercent: 20, showsPercent: true, isVertical: false)
-        XCTAssertEqual(base, MenuBarBarsView.Configuration(
+        #expect(base == MenuBarBarsView.Configuration(
             primaryPercent: 40, weekPercent: 20, showsPercent: true, isVertical: false))
 
-        XCTAssertFalse(base.preciseFill, "preciseFill must default to false")
-        XCTAssertFalse(base.halfWidthBars, "halfWidthBars must default to false")
+        #expect(!base.preciseFill, "preciseFill must default to false")
+        #expect(!base.halfWidthBars, "halfWidthBars must default to false")
 
         // Each field independently participates in equality — the app relies
         // on this to know when the menu-bar raster must change.
         var changed = base
         changed.primaryPercent = 41
-        XCTAssertNotEqual(base, changed)
+        #expect(base != changed)
 
         changed = base
         changed.weekPercent = nil
-        XCTAssertNotEqual(base, changed)
+        #expect(base != changed)
 
         changed = base
         changed.showsPercent = false
-        XCTAssertNotEqual(base, changed)
+        #expect(base != changed)
 
         changed = base
         changed.isVertical = true
-        XCTAssertNotEqual(base, changed)
+        #expect(base != changed)
 
         changed = base
         changed.preciseFill = true
-        XCTAssertNotEqual(base, changed)
+        #expect(base != changed)
 
         changed = base
         changed.halfWidthBars = true
-        XCTAssertNotEqual(base, changed)
+        #expect(base != changed)
     }
 
     // MARK: - PreciseBarsPreference
 
-    func testPreciseBarsPreferenceRoundTripsAndDefaultsToFalse() throws {
+    @Test func `Precise bars preference round-trips and defaults to false`() throws {
         let suiteName = "test.claudemon.preciseBars"
-        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.removePersistentDomain(forName: suiteName)
 
-        XCTAssertFalse(PreciseBarsPreference.read(from: defaults),
-                       "absent key must read as false (the default style)")
+        #expect(!PreciseBarsPreference.read(from: defaults),
+                "absent key must read as false (the default style)")
         PreciseBarsPreference.write(true, to: defaults)
-        XCTAssertTrue(PreciseBarsPreference.read(from: defaults))
+        #expect(PreciseBarsPreference.read(from: defaults))
         PreciseBarsPreference.write(false, to: defaults)
-        XCTAssertFalse(PreciseBarsPreference.read(from: defaults))
+        #expect(!PreciseBarsPreference.read(from: defaults))
 
         // A nil suite (unresolvable container) must fail soft to false.
-        XCTAssertFalse(PreciseBarsPreference.read(from: nil))
+        #expect(!PreciseBarsPreference.read(from: nil))
     }
 }

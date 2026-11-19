@@ -1,58 +1,46 @@
-import XCTest
+import Foundation
+import Testing
 @testable import ClaudemonCore
 
-final class UsageModelsCodableTests: XCTestCase {
-
-    private func date(
-        _ year: Int, _ month: Int, _ day: Int,
-        _ hour: Int = 0, _ minute: Int = 0, _ second: Int = 0,
-        tz: String = "Europe/Istanbul"
-    ) -> Date {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: tz)!
-        var c = DateComponents()
-        c.year = year; c.month = month; c.day = day
-        c.hour = hour; c.minute = minute; c.second = second
-        return cal.date(from: c)!
-    }
+struct UsageModelsCodableTests {
 
     /// JSONEncoder/Decoder mirroring SharedUsageCache (iso8601 dates).
-    private func encoder() -> JSONEncoder {
+    private let encoder: JSONEncoder = {
         let e = JSONEncoder()
         e.dateEncodingStrategy = .iso8601
         return e
-    }
+    }()
 
-    private func decoder() -> JSONDecoder {
+    private let decoder: JSONDecoder = {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601
         return d
-    }
+    }()
 
     // MARK: - UsageMetric
 
-    func testUsageMetricCodableRoundTripPreservesAllFields() throws {
+    @Test func `Usage metric round-trip preserves all fields`() throws {
         let metric = UsageMetric(
             kind: .session,
             rawLabel: "Current session",
             percent: 27,
-            resetDate: date(2026, 6, 24, 2, 49, 30, tz: "Europe/Istanbul"),
+            resetDate: makeDate(2026, 6, 24, 2, 49, 30, tz: "Europe/Istanbul"),
             timezoneIdentifier: "Europe/Istanbul"
         )
 
-        let data = try encoder().encode(metric)
-        let decoded = try decoder().decode(UsageMetric.self, from: data)
+        let data = try encoder.encode(metric)
+        let decoded = try decoder.decode(UsageMetric.self, from: data)
 
-        XCTAssertEqual(decoded.kind, .session)
-        XCTAssertEqual(decoded.rawLabel, "Current session")
-        XCTAssertEqual(decoded.percent, 27)
-        XCTAssertEqual(decoded.resetDate, metric.resetDate)
-        XCTAssertEqual(decoded.timezoneIdentifier, "Europe/Istanbul")
-        XCTAssertEqual(decoded.timezone, TimeZone(identifier: "Europe/Istanbul"))
-        XCTAssertEqual(decoded, metric)
+        #expect(decoded.kind == .session)
+        #expect(decoded.rawLabel == "Current session")
+        #expect(decoded.percent == 27)
+        #expect(decoded.resetDate == metric.resetDate)
+        #expect(decoded.timezoneIdentifier == "Europe/Istanbul")
+        #expect(decoded.timezone == TimeZone(identifier: "Europe/Istanbul"))
+        #expect(decoded == metric)
     }
 
-    func testUsageMetricNilDateAndTimezoneRoundTrip() throws {
+    @Test func `Usage metric nil date and timezone round-trip`() throws {
         let metric = UsageMetric(
             kind: .weekModel,
             rawLabel: "Current week (Fable)",
@@ -61,67 +49,67 @@ final class UsageModelsCodableTests: XCTestCase {
             timezoneIdentifier: nil
         )
 
-        let data = try encoder().encode(metric)
-        let decoded = try decoder().decode(UsageMetric.self, from: data)
+        let data = try encoder.encode(metric)
+        let decoded = try decoder.decode(UsageMetric.self, from: data)
 
-        XCTAssertNil(decoded.resetDate)
-        XCTAssertNil(decoded.timezoneIdentifier)
-        XCTAssertNil(decoded.timezone)
-        XCTAssertEqual(decoded, metric)
+        #expect(decoded.resetDate == nil)
+        #expect(decoded.timezoneIdentifier == nil)
+        #expect(decoded.timezone == nil)
+        #expect(decoded == metric)
     }
 
     // MARK: - UsageReport
 
-    func testUsageReportCodableRoundTripPreservesDatesAndTimezones() throws {
+    @Test func `Usage report round-trip preserves dates and timezones`() throws {
         let report = UsageReport(
             metrics: [
                 UsageMetric(kind: .session, rawLabel: "s", percent: 27,
-                            resetDate: date(2026, 6, 24, 2, 49, tz: "Europe/Istanbul"),
+                            resetDate: makeDate(2026, 6, 24, 2, 49, tz: "Europe/Istanbul"),
                             timezoneIdentifier: "Europe/Istanbul"),
                 UsageMetric(kind: .weekAll, rawLabel: "wa", percent: 29,
-                            resetDate: date(2026, 6, 26, 9, 59, tz: "America/New_York"),
+                            resetDate: makeDate(2026, 6, 26, 9, 59, tz: "America/New_York"),
                             timezoneIdentifier: "America/New_York"),
                 UsageMetric(kind: .weekModel, rawLabel: "wm", percent: 2,
-                            resetDate: date(2026, 6, 26, 10, 0, tz: "Asia/Tokyo"),
+                            resetDate: makeDate(2026, 6, 26, 10, 0, tz: "Asia/Tokyo"),
                             timezoneIdentifier: "Asia/Tokyo"),
             ],
-            capturedAt: date(2026, 6, 23, 12, 0, tz: "Europe/Istanbul")
+            capturedAt: makeDate(2026, 6, 23, 12, 0, tz: "Europe/Istanbul")
         )
 
-        let data = try encoder().encode(report)
-        let decoded = try decoder().decode(UsageReport.self, from: data)
+        let data = try encoder.encode(report)
+        let decoded = try decoder.decode(UsageReport.self, from: data)
 
-        XCTAssertEqual(decoded.capturedAt, report.capturedAt)
-        XCTAssertEqual(decoded.metrics.count, 3)
-        XCTAssertEqual(decoded.session?.resetDate, report.session?.resetDate)
-        XCTAssertEqual(decoded.weekAll?.timezoneIdentifier, "America/New_York")
-        XCTAssertEqual(decoded.weekModel?.timezoneIdentifier, "Asia/Tokyo")
-        XCTAssertEqual(decoded, report)
+        #expect(decoded.capturedAt == report.capturedAt)
+        #expect(decoded.metrics.count == 3)
+        #expect(decoded.session?.resetDate == report.session?.resetDate)
+        #expect(decoded.weekAll?.timezoneIdentifier == "America/New_York")
+        #expect(decoded.weekModel?.timezoneIdentifier == "Asia/Tokyo")
+        #expect(decoded == report)
     }
 
-    func testCachedUsageCodableRoundTrip() throws {
+    @Test func `Cached usage round-trip`() throws {
         let report = UsageReport(
             metrics: [
                 UsageMetric(kind: .session, rawLabel: "s", percent: 50,
-                            resetDate: date(2026, 6, 24, 2, 49, tz: "Europe/Istanbul"),
+                            resetDate: makeDate(2026, 6, 24, 2, 49, tz: "Europe/Istanbul"),
                             timezoneIdentifier: "Europe/Istanbul"),
             ],
-            capturedAt: date(2026, 6, 23, 12, 0, tz: "Europe/Istanbul")
+            capturedAt: makeDate(2026, 6, 23, 12, 0, tz: "Europe/Istanbul")
         )
         let payload = CachedUsage(
             report: report,
             state: .stale,
             errorMessage: "network down",
-            writtenAt: date(2026, 6, 23, 22, 30, 15, tz: "Europe/Istanbul")
+            writtenAt: makeDate(2026, 6, 23, 22, 30, 15, tz: "Europe/Istanbul")
         )
 
-        let data = try encoder().encode(payload)
-        let decoded = try decoder().decode(CachedUsage.self, from: data)
+        let data = try encoder.encode(payload)
+        let decoded = try decoder.decode(CachedUsage.self, from: data)
 
-        XCTAssertEqual(decoded.state, .stale)
-        XCTAssertEqual(decoded.errorMessage, "network down")
-        XCTAssertEqual(decoded.writtenAt, payload.writtenAt)
-        XCTAssertEqual(decoded.report, report)
+        #expect(decoded.state == .stale)
+        #expect(decoded.errorMessage == "network down")
+        #expect(decoded.writtenAt == payload.writtenAt)
+        #expect(decoded.report == report)
     }
 
     // MARK: - Primary / secondary limits
@@ -131,33 +119,33 @@ final class UsageModelsCodableTests: XCTestCase {
     }
 
     /// With a session limit, the session is primary and both weeks follow.
-    func testPrimaryIsSessionWhenReported() {
+    @Test func `Primary is the session when reported`() {
         let report = UsageReport(metrics: [
             metric(.session, "Current session", 12),
             metric(.weekAll, "Current week (all models)", 31),
             metric(.weekModel, "Current week (Fable)", 53),
         ], capturedAt: Date())
-        XCTAssertEqual(report.primary?.kind, .session)
-        XCTAssertEqual(report.secondary.map(\.kind), [.weekAll, .weekModel])
+        #expect(report.primary?.kind == .session)
+        #expect(report.secondary.map(\.kind) == [.weekAll, .weekModel])
     }
 
     /// Max plans have no session limit (no session line): the all-models week
     /// becomes primary and only the per-model week follows.
-    func testPrimaryFallsBackToWeekAllWithoutSession() {
+    @Test func `Primary falls back to the all-models week without a session`() {
         let report = UsageReport(metrics: [
             metric(.weekAll, "Current week (all models)", 31),
             metric(.weekModel, "Current week (Fable)", 53),
         ], capturedAt: Date())
-        XCTAssertEqual(report.primary?.kind, .weekAll)
-        XCTAssertEqual(report.secondary.map(\.kind), [.weekModel])
-        XCTAssertEqual(report.primary?.shortLabel, "Week")
-        XCTAssertEqual(report.secondary.first?.shortLabel, "Fable")
+        #expect(report.primary?.kind == .weekAll)
+        #expect(report.secondary.map(\.kind) == [.weekModel])
+        #expect(report.primary?.shortLabel == "Week")
+        #expect(report.secondary.first?.shortLabel == "Fable")
     }
 
-    func testShortDateStringUsesMetricTimezone() throws {
+    @Test func `Short date string uses the metric's timezone`() {
         // 2026-11-18 22:30 UTC is already Nov 19 in Istanbul (UTC+3).
         let date = Date(timeIntervalSince1970: 1_795_041_000)
-        XCTAssertEqual(UsageFormatting.shortDateString(date, timeZone: TimeZone(identifier: "UTC")), "Nov 18")
-        XCTAssertEqual(UsageFormatting.shortDateString(date, timeZone: TimeZone(identifier: "Europe/Istanbul")), "Nov 19")
+        #expect(UsageFormatting.shortDateString(date, timeZone: TimeZone(identifier: "UTC")) == "Nov 18")
+        #expect(UsageFormatting.shortDateString(date, timeZone: TimeZone(identifier: "Europe/Istanbul")) == "Nov 19")
     }
 }

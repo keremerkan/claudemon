@@ -2,7 +2,7 @@ import SwiftUI
 
 /// How the menu-bar label presents the live usage (the report's primary limit). Persisted by
 /// `UsageStore` as a raw string and chosen by the user in the settings footer.
-public enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
+public enum MenuBarDisplayMode: String, CaseIterable, Identifiable, Sendable {
     case iconAndText
     case textOnly
     case iconOnly
@@ -25,7 +25,7 @@ public enum MenuBarDisplayMode: String, CaseIterable, Identifiable {
 /// by `UsageStore` as a raw string. The per-model case's user-facing label is
 /// the model name Anthropic currently reports (see `UsageMetric.shortLabel`),
 /// so it is not hardcoded here.
-public enum MenuBarWeekBarSource: String, CaseIterable, Identifiable {
+public enum MenuBarWeekBarSource: String, CaseIterable, Identifiable, Sendable {
     /// Current Week (all models).
     case allModels
     /// The per-model current-week limit (e.g. Current Week (Fable)).
