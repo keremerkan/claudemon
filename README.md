@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/icon.png" width="128" height="128" alt="Claudemon app icon">
+</p>
+
 # Claudemon
 
 Claudemon is a native macOS menu-bar app that shows your **Claude Code
