@@ -58,7 +58,7 @@ final class UsageStore {
     @ObservationIgnored var floatingCompactChange: ((Bool) -> Void)?
 
     /// How the menu-bar label presents the session percent. Persisted as the
-    /// case's rawValue. Defaults to `.iconAndText`.
+    /// case's rawValue. Defaults to `.bars`.
     var menuBarDisplayMode: MenuBarDisplayMode {
         didSet {
             defaults.set(menuBarDisplayMode.rawValue, forKey: Self.menuBarDisplayModeKey)
@@ -206,7 +206,7 @@ final class UsageStore {
         self.floatingEnabled = defaults.bool(forKey: Self.floatingDefaultsKey)
         self.floatingCompact = defaults.bool(forKey: Self.floatingCompactKey)
         let storedMode = defaults.string(forKey: Self.menuBarDisplayModeKey)
-        self.menuBarDisplayMode = storedMode.flatMap(MenuBarDisplayMode.init(rawValue:)) ?? .iconAndText
+        self.menuBarDisplayMode = storedMode.flatMap(MenuBarDisplayMode.init(rawValue:)) ?? .bars
         self.menuBarShowsWeekBar = defaults.bool(forKey: Self.menuBarShowsWeekBarKey)
         let storedSource = defaults.string(forKey: Self.menuBarWeekBarSourceKey)
         self.menuBarWeekBarSource = storedSource.flatMap(MenuBarWeekBarSource.init(rawValue:)) ?? .allModels

@@ -23,6 +23,9 @@ now signed by AKE Software GmbH.
 
 ### Changed
 
+- New defaults: the menu bar uses the **Bar graph** style, and **Precise bar
+  fill** is on. If you kept the Icon + Text style, the menu bar switches to
+  the bar graph; pick your style again in Settings if you prefer it.
 - The floating window shows a ring for every limit instead of one ring and
   bars; its footer is centered.
 - The small desktop widget shows only the main limit's ring.
@@ -57,8 +60,8 @@ now signed by AKE Software GmbH.
 
 ### Upgrade notes
 
-- The new signature uses a new shared container, so **Precise bar fill**
-  starts off; turn it on again in Settings if you used it.
+- **Precise bar fill** is now on for everyone; turn it off in Settings if you
+  prefer the rounded fills.
 - macOS may ask you to approve **Launch at login** again in System Settings →
   General → Login Items.
 - If a desktop widget shows "Open Claudemon", open the app once.

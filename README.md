@@ -55,10 +55,10 @@ settings, then pick a **Menu bar style**:
 
 | Style | Shows | Notes |
 | --- | --- | --- |
-| **Icon + Text** | gauge icon + main limit percent (e.g. `◐ 28%`) | Default |
+| **Icon + Text** | gauge icon + main limit percent (e.g. `◐ 28%`) | |
 | **Text only** | just the percent (`28%`) | Smallest footprint that still shows the number |
 | **Icon only** | just the gauge icon | Tightest footprint |
-| **Bar graph** | a fixed-width usage bar for the main limit | Colored green/yellow/red like the in-app bars; options below |
+| **Bar graph** | a fixed-width usage bar for the main limit | Default. Colored green/yellow/red like the in-app bars; options below |
 
 Choosing **Bar graph** reveals four extra options under the style picker:
 
@@ -98,12 +98,12 @@ available again. A window you never touched resets silently. Each alert
 point, including the reset announcement, can be toggled individually.
 
 **Precise bar fill** applies to every usage bar Claudemon draws — the menu-bar
-bar graph, the panel, and the medium desktop widget. By default,
-bar fills are rounded and keep a small minimum size so low values still read as
-"some usage" at a glance — the trade-off is that 2% and 8% look almost the
-same. With precise fill on, fills are drawn straight-edged at their exact
-proportional width (the bar's outline stays rounded), so small values are
-visually distinct.
+bar graph, the panel, and the medium desktop widget, and it's on by default:
+fills are drawn straight-edged at their exact proportional width (the bar's
+outline stays rounded), so small values like 2% and 8% are visually distinct.
+Turned off, fills are rounded and keep a small minimum size so low values still
+read as "some usage" at a glance, at the cost of 2% and 8% looking almost the
+same.
 
 **Show remaining** counts down instead of up: every number, bar, ring and
 gauge icon shows what's left of each limit, from 100% down to 0% (the panel

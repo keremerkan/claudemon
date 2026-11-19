@@ -30,18 +30,23 @@ struct MenuBarMiniBarTests {
     // MARK: - Shared display preferences
 
     @Test(arguments: [SharedPreference.preciseBars, .showsRemaining])
-    func `Shared preference round-trips and defaults to false`(preference: SharedPreference) {
+    func `Shared preference round-trips and reads its default when unset`(preference: SharedPreference) {
         let suite = TestDefaults()
 
-        #expect(!preference.read(from: suite.defaults),
-                "absent key must read as false (the default style)")
+        #expect(preference.read(from: suite.defaults) == preference.defaultValue,
+                "an absent key must read as the preference's default")
         preference.write(true, to: suite.defaults)
         #expect(preference.read(from: suite.defaults))
         preference.write(false, to: suite.defaults)
-        #expect(!preference.read(from: suite.defaults))
+        #expect(!preference.read(from: suite.defaults), "an explicit off must not fall back to the default")
 
-        // A nil suite (unresolvable container) must fail soft to false.
-        #expect(!preference.read(from: nil))
+        // A nil suite (unresolvable container) fails soft to the default.
+        #expect(preference.read(from: nil) == preference.defaultValue)
+    }
+
+    @Test func `Precise fill is on and Show remaining off by default`() {
+        #expect(SharedPreference.preciseBars.defaultValue)
+        #expect(!SharedPreference.showsRemaining.defaultValue)
     }
 
     @Test func `Shared preference keys are stable`() {

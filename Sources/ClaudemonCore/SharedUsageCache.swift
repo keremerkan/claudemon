@@ -22,18 +22,21 @@ public let claudemonRingsWidgetKind = "ClaudemonRingsWidget"
 
 /// A display preference shared between the app (writer) and the widget
 /// (reader) through the App Group defaults suite — the widget runs in its own
-/// process and cannot see the app's standard defaults. Absent reads as false.
+/// process and cannot see the app's standard defaults. A preference never set
+/// (or an unreachable suite) reads as its `defaultValue`.
 public struct SharedPreference: Sendable {
     public let key: String
+    public let defaultValue: Bool
 
-    /// Exact straight-edged bar fills instead of the min-sliver capsule.
-    public static let preciseBars = SharedPreference(key: "preciseBarFill")
+    /// Exact straight-edged bar fills instead of the min-sliver capsule. On by
+    /// default.
+    public static let preciseBars = SharedPreference(key: "preciseBarFill", defaultValue: true)
     /// Show what's left of each limit (100% → 0%) instead of what's used.
-    public static let showsRemaining = SharedPreference(key: "showsRemainingUsage")
+    public static let showsRemaining = SharedPreference(key: "showsRemainingUsage", defaultValue: false)
 
     /// `defaults` is injectable for tests; production uses the App Group suite.
     public func read(from defaults: UserDefaults? = UserDefaults(suiteName: claudemonAppGroupID)) -> Bool {
-        defaults?.bool(forKey: key) ?? false
+        defaults?.object(forKey: key) as? Bool ?? defaultValue
     }
 
     public func write(_ value: Bool, to defaults: UserDefaults? = UserDefaults(suiteName: claudemonAppGroupID)) {
