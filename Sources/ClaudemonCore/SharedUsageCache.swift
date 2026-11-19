@@ -18,18 +18,23 @@ public let claudemonAppGroupID = "GH4CGS3B5H.group.com.claudemon.app"
 /// The widget kind string, shared so the app can request reloads by name.
 public let claudemonWidgetKind = "ClaudemonWidget"
 
-/// The "precise bar fill" display preference, shared between the app (writer)
-/// and the widget (reader) through the App Group defaults suite — the widget
-/// runs in its own process and cannot see the app's standard defaults.
-public enum PreciseBarsPreference {
-    public static let key = "preciseBarFill"
+/// A display preference shared between the app (writer) and the widget
+/// (reader) through the App Group defaults suite — the widget runs in its own
+/// process and cannot see the app's standard defaults. Absent reads as false.
+public struct SharedPreference: Sendable {
+    public let key: String
+
+    /// Exact straight-edged bar fills instead of the min-sliver capsule.
+    public static let preciseBars = SharedPreference(key: "preciseBarFill")
+    /// Show what's left of each limit (100% → 0%) instead of what's used.
+    public static let showsRemaining = SharedPreference(key: "showsRemainingUsage")
 
     /// `defaults` is injectable for tests; production uses the App Group suite.
-    public static func read(from defaults: UserDefaults? = UserDefaults(suiteName: claudemonAppGroupID)) -> Bool {
+    public func read(from defaults: UserDefaults? = UserDefaults(suiteName: claudemonAppGroupID)) -> Bool {
         defaults?.bool(forKey: key) ?? false
     }
 
-    public static func write(_ value: Bool, to defaults: UserDefaults? = UserDefaults(suiteName: claudemonAppGroupID)) {
+    public func write(_ value: Bool, to defaults: UserDefaults? = UserDefaults(suiteName: claudemonAppGroupID)) {
         defaults?.set(value, forKey: key)
     }
 }

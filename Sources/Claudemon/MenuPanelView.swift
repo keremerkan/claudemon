@@ -31,6 +31,7 @@ struct MenuPanelView: View {
         }
         .padding(16)
         .frame(width: 320)
+        .environment(\.showsRemainingUsage, store.showsRemaining)
     }
 
     // MARK: - Header
@@ -38,7 +39,7 @@ struct MenuPanelView: View {
     private var header: some View {
         HStack(spacing: 8) {
             // Same needle as the menu-bar icon: the main limit's usage.
-            Image(systemName: UsageGauge.symbolName(for: store.menuBarPrimaryMetric?.percent))
+            Image(systemName: store.menuBarGaugeSymbol)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.tint)
             Text("Claudemon")
@@ -173,17 +174,7 @@ struct MenuPanelView: View {
     @ViewBuilder
     private var notificationSettings: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label("Usage alerts", systemImage: "bell")
-                    .accessibilityHidden(true)
-                Spacer(minLength: 8)
-                Toggle("", isOn: $notifications.isEnabled)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .accessibilityLabel("Usage alerts")
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            settingSwitch("Usage alerts", systemImage: "bell", isOn: $notifications.isEnabled)
 
             if notifications.isEnabled {
                 VStack(alignment: .leading, spacing: 4) {
@@ -232,6 +223,30 @@ struct MenuPanelView: View {
             .toggleStyle(.checkbox)
             .controlSize(.small)
             .font(.caption)
+    }
+
+    /// A settings row: icon label on the left, a small switch on the right.
+    private func settingSwitch(_ title: String, systemImage: String, isOn: Binding<Bool>) -> some View {
+        HStack {
+            Label(title, systemImage: systemImage)
+                .accessibilityHidden(true)
+            Spacer(minLength: 8)
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .accessibilityLabel(title)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The small secondary text explaining the setting above it.
+    private func settingCaption(_ text: String) -> some View {
+        Text(text)
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// A compact All models / <model name> menu for choosing a weekly limit.
@@ -318,53 +333,19 @@ struct MenuPanelView: View {
                 .transition(.opacity)
             }
 
-            HStack {
-                Label("Floating widget", systemImage: "rectangle.on.rectangle")
-                    .accessibilityHidden(true)
-                Spacer(minLength: 8)
-                Toggle("", isOn: $store.floatingEnabled)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .accessibilityLabel("Floating widget")
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            settingSwitch("Floating widget", systemImage: "rectangle.on.rectangle", isOn: $store.floatingEnabled)
 
-            Text("Prefer a desktop widget? Add \u{201C}Claude Usage\u{201D} from Notification Center.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            settingCaption("Prefer a desktop widget? Add \u{201C}Claude Usage\u{201D} from Notification Center.")
 
-            HStack {
-                Label("Precise bar fill", systemImage: "ruler")
-                    .accessibilityHidden(true)
-                Spacer(minLength: 8)
-                Toggle("", isOn: $store.preciseBars)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .accessibilityLabel("Precise bar fill")
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            settingSwitch("Precise bar fill", systemImage: "ruler", isOn: $store.preciseBars)
 
-            Text("Draw bar fills at their exact width, so low values like 2% and 8% look different.")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            settingCaption("Draw bar fills at their exact width, so low values like 2% and 8% look different.")
 
-            HStack {
-                Label("Launch at login", systemImage: "power")
-                    .accessibilityHidden(true)
-                Spacer(minLength: 8)
-                Toggle("", isOn: $loginItem.isEnabled)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .accessibilityLabel("Launch at login")
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            settingSwitch("Show remaining", systemImage: "battery.75percent", isOn: $store.showsRemaining)
+
+            settingCaption("Count down from 100% instead of up from 0%: numbers, bars, rings and gauges show what's left.")
+
+            settingSwitch("Launch at login", systemImage: "power", isOn: $loginItem.isEnabled)
 
             notificationSettings
 
@@ -485,6 +466,8 @@ struct MetricRow: View {
     let metric: UsageMetric
     let preciseBar: Bool
 
+    @Environment(\.showsRemainingUsage) private var showsRemaining
+
     var body: some View {
         // Re-render every 30s so the "resets in" countdown stays current.
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -499,7 +482,9 @@ struct MetricRow: View {
                 Text(metric.displayLabel)
                     .font(.subheadline.weight(.medium))
                 Spacer()
-                Text("\(metric.percent)%")
+                // "73% left" when counting down, so the direction is explicit
+                // in the detailed view; the color still tracks usage.
+                Text("\(UsageDisplay.percent(metric.percent, remaining: showsRemaining))%\(showsRemaining ? " left" : "")")
                     .font(.subheadline.monospacedDigit())
                     .foregroundStyle(UsageColor.color(for: metric.percent))
             }
@@ -519,7 +504,7 @@ struct MetricRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(metric.displayLabel), \(metric.percent) percent used. \(resetDescription)")
+        .accessibilityLabel("\(metric.displayLabel), \(UsageDisplay.spoken(metric.percent, remaining: showsRemaining)). \(resetDescription)")
     }
 
     private func resetDescription(now: Date) -> String {

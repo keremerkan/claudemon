@@ -76,19 +76,19 @@ struct MenuBarLabel: View {
     private func modeContent(percent: Int) -> some View {
         switch store.menuBarDisplayMode {
         case .iconAndText:
-            Image(systemName: gaugeSymbol)
-            percentText("\(percent)%")
+            Image(systemName: store.menuBarGaugeSymbol)
+            percentText("\(store.shownPercent(percent))%")
         case .textOnly:
-            percentText("\(percent)%")
+            percentText("\(store.shownPercent(percent))%")
         case .iconOnly:
-            Image(systemName: gaugeSymbol)
+            Image(systemName: store.menuBarGaugeSymbol)
         case .bars:
             if let image = barsImage(primaryPercent: percent) {
                 Image(nsImage: image)
             } else {
                 // Rasterization failed (shouldn't happen): fall back to text
                 // so the item is never empty.
-                percentText("\(percent)%")
+                percentText("\(store.shownPercent(percent))%")
             }
         }
     }
@@ -108,7 +108,8 @@ struct MenuBarLabel: View {
             halfWidthBars: store.menuBarBarsHalfWidth
         )
         let renderer = ImageRenderer(content: MenuBarBarsView(config)
-            .environment(\.colorScheme, colorScheme))
+            .environment(\.colorScheme, colorScheme)
+            .environment(\.showsRemainingUsage, store.showsRemaining))
         renderer.scale = displayScale > 0
             ? displayScale
             : (NSScreen.main?.backingScaleFactor ?? 2)
@@ -124,23 +125,22 @@ struct MenuBarLabel: View {
             .monospacedDigit()
     }
 
-    /// The gauge needle nearest the main limit's percent. Without data (not
-    /// installed / signed in / loading) it shows a neutral empty gauge.
-    private var gaugeSymbol: String {
-        UsageGauge.symbolName(for: store.menuBarPrimaryMetric?.percent)
-    }
-
     private var accessibilityLabel: String {
         if let primary = store.menuBarPrimaryMetric {
-            let summary = "Claudemon, \(spokenName(primary)) \(primary.percent) percent"
+            let summary = "Claudemon, \(spokenName(primary)) \(spokenPercent(primary))"
             if store.menuBarDisplayMode == .bars, let second = store.menuBarSecondMetric {
-                return "\(summary), \(spokenName(second)) \(second.percent) percent used"
+                return "\(summary), \(spokenName(second)) \(spokenPercent(second))"
             }
-            return "\(summary) used"
+            return summary
         }
         if store.isNotInstalled { return "Claudemon, Claude Code isn't installed" }
         if store.isNotSignedIn { return "Claudemon, sign in to Claude Code" }
         return store.errorMessage ?? "Claudemon, loading usage"
+    }
+
+    /// "27 percent used" or "73 percent left", per the remaining setting.
+    private func spokenPercent(_ metric: UsageMetric) -> String {
+        UsageDisplay.spoken(metric.percent, remaining: store.showsRemaining)
     }
 
     /// "session", "week", or "Fable week" for VoiceOver.

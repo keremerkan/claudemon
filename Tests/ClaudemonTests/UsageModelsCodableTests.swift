@@ -163,4 +163,20 @@ struct UsageModelsCodableTests {
     func `Gauge needle is the nearest step`(percent: Int?, step: Int) {
         #expect(UsageGauge.symbolName(for: percent) == "gauge.with.dots.needle.\(step)percent")
     }
+
+    // MARK: - Remaining display
+
+    @Test(arguments: [
+        (0, 0, 100), (27, 27, 73), (100, 100, 0),
+        (-5, 0, 100), (130, 100, 0),   // out-of-range input clamps first
+    ])
+    func `Shown percent counts up or down`(used: Int, shownUsed: Int, shownLeft: Int) {
+        #expect(UsageDisplay.percent(used, remaining: false) == shownUsed)
+        #expect(UsageDisplay.percent(used, remaining: true) == shownLeft)
+    }
+
+    @Test func `Spoken percent names its direction`() {
+        #expect(UsageDisplay.spoken(27, remaining: false) == "27 percent used")
+        #expect(UsageDisplay.spoken(27, remaining: true) == "73 percent left")
+    }
 }

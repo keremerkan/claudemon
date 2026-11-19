@@ -83,6 +83,9 @@ public struct MenuBarBarsView: View {
     }
 
     private let config: Configuration
+    /// Count down from 100% (what's left) instead of up from 0%. Read from the
+    /// environment like the bars it labels, so set it on the rendered view.
+    @Environment(\.showsRemainingUsage) private var showsRemaining
 
     /// The menu bar's usable content height.
     private static let contentHeight: CGFloat = 16
@@ -172,7 +175,7 @@ public struct MenuBarBarsView: View {
 
     /// Fixed-width, monospaced-digit percent so the image width is stable.
     private func percentText(_ percent: Int, size: CGFloat) -> some View {
-        Text("\(percent)%")
+        Text("\(UsageDisplay.percent(percent, remaining: showsRemaining))%")
             .font(.system(size: size, weight: .medium))
             .monospacedDigit()
             .foregroundStyle(.primary)

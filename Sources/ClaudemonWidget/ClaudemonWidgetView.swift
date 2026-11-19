@@ -38,6 +38,8 @@ struct SmallUsageView: View {
     private var ringLabel: String { primary?.shortLabel ?? UsageMetric.Kind.session.shortName }
     private var next: UsageMetric? { report.secondary.first }
 
+    @Environment(\.showsRemainingUsage) private var showsRemaining
+
     /// Blank space a `.callout` line keeps below its baseline. The "as of"
     /// line ends with it, so the ring gets the same inset on top and the
     /// visible gaps to the top and bottom edges match.
@@ -58,7 +60,7 @@ struct SmallUsageView: View {
                         Text(next.shortLabel)
                             .font(.title3)
                             .foregroundStyle(.secondary)
-                        Text("\(next.percent)%")
+                        Text("\(UsageDisplay.percent(next.percent, remaining: showsRemaining))%")
                             .font(.title3.weight(.semibold).monospacedDigit())
                             .foregroundStyle(UsageColor.color(for: next.percent))
                     }
@@ -77,7 +79,7 @@ struct SmallUsageView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityLabel([primary, next].compactMap { $0 }
-            .map { "\($0.shortLabel) \($0.percent) percent" }
+            .map { "\($0.shortLabel) \(UsageDisplay.spoken($0.percent, remaining: showsRemaining))" }
             .joined(separator: ", "))
     }
 
@@ -92,7 +94,7 @@ struct SmallUsageView: View {
             ZStack {
                 UsageRing(percent: ringPercent, lineWidth: lineWidth)
                 VStack(spacing: 1) {
-                    Text("\(ringPercent)%")
+                    Text("\(UsageDisplay.percent(ringPercent, remaining: showsRemaining))%")
                         .font(.system(size: percentFont, weight: .bold).monospacedDigit())
                         .minimumScaleFactor(0.5)
                         .lineLimit(1)
@@ -130,11 +132,14 @@ struct MediumUsageView: View {
     let isStale: Bool
     let preciseBars: Bool
 
+    @Environment(\.showsRemainingUsage) private var showsRemaining
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 // The needle follows the main limit (see `UsageReport.primary`).
-                Image(systemName: UsageGauge.symbolName(for: report.primary?.percent))
+                Image(systemName: UsageGauge.symbolName(
+                    for: report.primary.map { UsageDisplay.percent($0.percent, remaining: showsRemaining) }))
                     .foregroundStyle(.tint)
                 Text("Claude Usage")
                     .font(.subheadline.weight(.semibold))
@@ -160,14 +165,14 @@ struct MediumUsageView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("\(metric.percent)%")
+                Text("\(UsageDisplay.percent(metric.percent, remaining: showsRemaining))%")
                     .font(.caption2.weight(.semibold).monospacedDigit())
                     .foregroundStyle(UsageColor.color(for: metric.percent))
             }
             UsageBar(percent: metric.percent, height: 6, precise: preciseBars)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(metric.displayLabel), \(metric.percent) percent")
+        .accessibilityLabel("\(metric.displayLabel), \(UsageDisplay.spoken(metric.percent, remaining: showsRemaining))")
     }
 }
 

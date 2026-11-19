@@ -82,22 +82,27 @@ struct MenuBarMiniBarTests {
         #expect(base != changed)
     }
 
-    // MARK: - PreciseBarsPreference
+    // MARK: - Shared display preferences
 
-    @Test func `Precise bars preference round-trips and defaults to false`() throws {
-        let suiteName = "test.claudemon.preciseBars"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-        defaults.removePersistentDomain(forName: suiteName)
+    @Test(arguments: [SharedPreference.preciseBars, .showsRemaining])
+    func `Shared preference round-trips and defaults to false`(preference: SharedPreference) {
+        let suite = TestDefaults()
 
-        #expect(!PreciseBarsPreference.read(from: defaults),
+        #expect(!preference.read(from: suite.defaults),
                 "absent key must read as false (the default style)")
-        PreciseBarsPreference.write(true, to: defaults)
-        #expect(PreciseBarsPreference.read(from: defaults))
-        PreciseBarsPreference.write(false, to: defaults)
-        #expect(!PreciseBarsPreference.read(from: defaults))
+        preference.write(true, to: suite.defaults)
+        #expect(preference.read(from: suite.defaults))
+        preference.write(false, to: suite.defaults)
+        #expect(!preference.read(from: suite.defaults))
 
         // A nil suite (unresolvable container) must fail soft to false.
-        #expect(!PreciseBarsPreference.read(from: nil))
+        #expect(!preference.read(from: nil))
+    }
+
+    @Test func `Shared preferences use distinct keys`() {
+        // The widget reads these by key; the precise-bars key predates the
+        // shared type and must not change, or users lose their setting.
+        #expect(SharedPreference.preciseBars.key == "preciseBarFill")
+        #expect(SharedPreference.preciseBars.key != SharedPreference.showsRemaining.key)
     }
 }

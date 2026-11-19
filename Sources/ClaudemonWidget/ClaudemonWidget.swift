@@ -14,6 +14,8 @@ struct UsageEntry: TimelineEntry {
     /// Exact straight-edged bar fills (app setting, shared via the App Group
     /// defaults suite).
     let preciseBars: Bool
+    /// Count down from 100% (app setting, shared the same way).
+    let showsRemaining: Bool
 }
 
 // MARK: - Provider (network-free: reads ONLY the App Group cache)
@@ -24,7 +26,7 @@ struct UsageProvider: TimelineProvider {
 
     func placeholder(in context: Context) -> UsageEntry {
         UsageEntry(date: Date(), report: Self.sampleReport, capturedAt: Date(),
-                   isStale: false, preciseBars: false)
+                   isStale: false, preciseBars: false, showsRemaining: false)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (UsageEntry) -> Void) {
@@ -41,17 +43,19 @@ struct UsageProvider: TimelineProvider {
 
     /// Build an entry from the shared cache, falling back gracefully.
     private func makeEntry() -> UsageEntry {
-        let precise = PreciseBarsPreference.read()
+        let precise = SharedPreference.preciseBars.read()
+        let remaining = SharedPreference.showsRemaining.read()
         guard let cached = cache.read() else {
             return UsageEntry(date: Date(), report: nil, capturedAt: nil,
-                              isStale: false, preciseBars: precise)
+                              isStale: false, preciseBars: precise, showsRemaining: remaining)
         }
         return UsageEntry(
             date: Date(),
             report: cached.report,
             capturedAt: cached.report != nil ? cached.writtenAt : nil,
             isStale: cached.state != .ok,
-            preciseBars: precise
+            preciseBars: precise,
+            showsRemaining: remaining
         )
     }
 
@@ -71,6 +75,7 @@ struct ClaudemonWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: claudemonWidgetKind, provider: UsageProvider()) { entry in
             ClaudemonWidgetView(entry: entry)
+                .environment(\.showsRemainingUsage, entry.showsRemaining)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
         .configurationDisplayName("Claude Usage")

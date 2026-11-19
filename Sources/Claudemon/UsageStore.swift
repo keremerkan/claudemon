@@ -133,7 +133,17 @@ final class UsageStore {
     /// redraw promptly instead of waiting out its ~15-minute timeline policy.
     var preciseBars: Bool {
         didSet {
-            PreciseBarsPreference.write(preciseBars)
+            SharedPreference.preciseBars.write(preciseBars)
+            WidgetCenter.shared.reloadTimelines(ofKind: claudemonWidgetKind)
+        }
+    }
+
+    /// Show what's left of each limit (100% → 0%) instead of what's used, on
+    /// every surface: numbers, bars, rings and gauge icons. Shared with the
+    /// widget through the App Group suite, like `preciseBars`.
+    var showsRemaining: Bool {
+        didSet {
+            SharedPreference.showsRemaining.write(showsRemaining)
             WidgetCenter.shared.reloadTimelines(ofKind: claudemonWidgetKind)
         }
     }
@@ -210,7 +220,8 @@ final class UsageStore {
         self.menuBarShowsPercent = (defaults.object(forKey: Self.menuBarShowsPercentKey) as? Bool) ?? true
         self.menuBarBarsVertical = defaults.bool(forKey: Self.menuBarBarsVerticalKey)
         self.menuBarBarsHalfWidth = defaults.bool(forKey: Self.menuBarBarsHalfWidthKey)
-        self.preciseBars = PreciseBarsPreference.read()
+        self.preciseBars = SharedPreference.preciseBars.read()
+        self.showsRemaining = SharedPreference.showsRemaining.read()
     }
 
     // MARK: - Lifecycle
@@ -530,6 +541,17 @@ final class UsageStore {
         }
         guard menuBarShowsSecondWeekBar else { return nil }
         return report.metrics.first { $0.kind != .session && $0.kind != primary.kind }
+    }
+
+    /// The percent to show for a used percentage, per `showsRemaining`.
+    func shownPercent(_ used: Int) -> Int {
+        UsageDisplay.percent(used, remaining: showsRemaining)
+    }
+
+    /// The gauge icon for the menu bar's main limit, shared by the menu-bar
+    /// label and the panel header.
+    var menuBarGaugeSymbol: String {
+        UsageGauge.symbolName(for: menuBarPrimaryMetric.map { shownPercent($0.percent) })
     }
 
     /// Settings label for the second weekly bar without a session limit: the

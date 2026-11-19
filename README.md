@@ -79,8 +79,8 @@ The panel itself opens **clean** — usage data plus **Refresh** / **Quit** only
 **Right-click** (or control-click) the menu bar item in any style for a quick
 **Refresh** / **Quit** menu without opening the panel.
 The **⚙︎ gear** in the panel header reveals (and hides) the settings section:
-**Menu bar style**, **Floating widget**, **Precise bar fill**, **Launch at
-login**, and **Usage alerts**. Settings stay collapsed by default so the
+**Menu bar style**, **Floating widget**, **Precise bar fill**, **Show
+remaining**, **Launch at login**, and **Usage alerts**. Settings stay collapsed by default so the
 everyday glance is uncluttered.
 
 **Usage alerts** post a macOS notification once per quota window when a
@@ -96,6 +96,11 @@ bar fills are rounded and keep a small minimum size so low values still read as
 same. With precise fill on, fills are drawn straight-edged at their exact
 proportional width (the bar's outline stays rounded), so small values are
 visually distinct.
+
+**Show remaining** counts down instead of up: every number, bar, ring and
+gauge icon shows what's left of each limit, from 100% down to 0% (the panel
+rows say "73% left"). Colors still follow usage, so a limit running out turns
+yellow and then red either way.
 
 > macOS's `MenuBarExtra` doesn't allow custom font sizes or colored labels in
 > the menu-bar item, so the text styles can only show the gauge icon and/or the

@@ -36,6 +36,7 @@ struct FloatingWidgetView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilitySummary)
         .accessibilityHint("Double-click to switch between the mini and full view")
+        .environment(\.showsRemainingUsage, store.showsRemaining)
     }
 
     // MARK: - Large form
@@ -111,7 +112,7 @@ struct FloatingWidgetView: View {
             UsageRing(percent: primaryPercent, lineWidth: lineWidth)
             VStack(spacing: 1) {
                 if hasData {
-                    Text("\(primaryPercent)%")
+                    Text("\(store.shownPercent(primaryPercent))%")
                         .font(.system(size: percentFont, weight: .bold).monospacedDigit())
                         .foregroundStyle(.primary)
                 } else {
@@ -152,7 +153,7 @@ struct FloatingWidgetView: View {
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 4)
-                Text(percent.map { "\($0)%" } ?? "—")
+                Text(percent.map { "\(store.shownPercent($0))%" } ?? "—")
                     .font(.system(size: 11, weight: .semibold).monospacedDigit())
                     .foregroundStyle(percent.map { UsageColor.color(for: $0) } ?? .secondary)
             }
@@ -221,7 +222,7 @@ struct FloatingWidgetView: View {
         if store.isNotSignedIn { return "Sign in to Claude Code. Run claude then slash login." }
         guard let report = store.lastGoodReport else { return store.errorMessage ?? "Loading usage" }
         var summary = report.metrics
-            .map { "\($0.shortLabel) \($0.percent) percent" }
+            .map { "\($0.shortLabel) \(UsageDisplay.spoken($0.percent, remaining: store.showsRemaining))" }
             .joined(separator: ", ")
         if let resetHint, let primary {
             summary += ", \(primary.shortLabel.lowercased()) \(resetHint)"
