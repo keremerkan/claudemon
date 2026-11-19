@@ -37,7 +37,8 @@ struct MenuPanelView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image(systemName: "gauge.with.dots.needle.50percent")
+            // Same needle as the menu-bar icon: the main limit's usage.
+            Image(systemName: UsageGauge.symbolName(for: store.menuBarPrimaryMetric?.percent))
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.tint)
             Text("Claudemon")

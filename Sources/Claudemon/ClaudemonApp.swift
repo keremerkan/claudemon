@@ -124,16 +124,10 @@ struct MenuBarLabel: View {
             .monospacedDigit()
     }
 
-    /// Pick a gauge glyph roughly reflecting the primary limit's fill level.
-    /// When Claude Code isn't installed / signed in, show a neutral empty gauge
-    /// (no alarm).
+    /// The gauge needle nearest the main limit's percent. Without data (not
+    /// installed / signed in / loading) it shows a neutral empty gauge.
     private var gaugeSymbol: String {
-        guard let p = store.menuBarPrimaryMetric?.percent else { return "gauge.with.dots.needle.0percent" }
-        switch p {
-        case ..<34: return "gauge.with.dots.needle.0percent"
-        case 34..<67: return "gauge.with.dots.needle.50percent"
-        default: return "gauge.with.dots.needle.100percent"
-        }
+        UsageGauge.symbolName(for: store.menuBarPrimaryMetric?.percent)
     }
 
     private var accessibilityLabel: String {

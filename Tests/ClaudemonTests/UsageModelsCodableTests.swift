@@ -148,4 +148,19 @@ struct UsageModelsCodableTests {
         #expect(UsageFormatting.shortDateString(date, timeZone: TimeZone(identifier: "UTC")) == "Nov 18")
         #expect(UsageFormatting.shortDateString(date, timeZone: TimeZone(identifier: "Europe/Istanbul")) == "Nov 19")
     }
+
+    // MARK: - Gauge icon
+
+    /// The needle is the nearest of SF Symbols' 0/33/50/67/100 positions;
+    /// these cases sit on both sides of each midpoint.
+    @Test(arguments: [
+        (nil, 0), (-5, 0), (0, 0), (16, 0),
+        (17, 33), (41, 33),
+        (42, 50), (58, 50),
+        (59, 67), (83, 67),
+        (84, 100), (100, 100), (130, 100),
+    ] as [(Int?, Int)])
+    func `Gauge needle is the nearest step`(percent: Int?, step: Int) {
+        #expect(UsageGauge.symbolName(for: percent) == "gauge.with.dots.needle.\(step)percent")
+    }
 }

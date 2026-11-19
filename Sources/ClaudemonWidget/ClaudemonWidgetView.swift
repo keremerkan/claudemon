@@ -133,7 +133,8 @@ struct MediumUsageView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: "gauge.with.dots.needle.50percent")
+                // The needle follows the main limit (see `UsageReport.primary`).
+                Image(systemName: UsageGauge.symbolName(for: report.primary?.percent))
                     .foregroundStyle(.tint)
                 Text("Claude Usage")
                     .font(.subheadline.weight(.semibold))
@@ -175,7 +176,7 @@ struct MediumUsageView: View {
 struct EmptyUsageView: View {
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: "gauge.with.dots.needle.0percent")
+            Image(systemName: UsageGauge.symbolName(for: nil))
                 .font(.system(size: 26))
                 .foregroundStyle(.secondary)
             Text("Open Claudemon")
