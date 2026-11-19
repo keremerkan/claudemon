@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Needle and hub, pure white. Hub: centre (512.00, 558.60) (the arcs'
+       centre), radius 40.21. Needle: from the hub centre along 57.6°, width
+       20.93, round tip centred 265.15 out (it ends inside the fill's round end). -->
+  <line x1="512.00" y1="558.60" x2="654.07" y2="334.72" stroke="#FFFFFF" stroke-width="20.93" stroke-linecap="round"/>
+  <circle cx="512.00" cy="558.60" r="40.21" fill="#FFFFFF"/>
+</svg>

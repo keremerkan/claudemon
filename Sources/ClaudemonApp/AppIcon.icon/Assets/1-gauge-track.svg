@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Gauge track: 270° arc open at the bottom, round ends. Centre (512.00, 558.60),
+       radius 307.29, width 129.39. The original draws it white at 25% opacity. -->
+  <path d="M 294.72 775.88 A 307.29 307.29 0 1 1 729.28 775.88" fill="none" stroke="#FFFFFF" stroke-width="129.39" stroke-linecap="round"/>
+</svg>

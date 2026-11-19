@@ -109,6 +109,7 @@
 				Claudemon/UpdateChecker.swift,
 				Claudemon/UsageFetcher.swift,
 				Claudemon/UsageStore.swift,
+				ClaudemonApp/AppIcon.icon,
 				ClaudemonApp/Assets.xcassets,
 			);
 			target = 66437C394DA9F97C527E32AF /* Claudemon */;
