@@ -295,6 +295,20 @@ Prerequisites on the build machine:
   `NOTARY_PROFILE=<name> ./scripts/release-dmg.sh`.) No secrets are stored in
   this repo — the script references the profile by name only.
 
+### Publishing a release
+
+1. Publish the GitHub release with the notarized DMG attached:
+
+   ```bash
+   gh release create vX.Y.Z dist/Claudemon.dmg --title "Claudemon X.Y.Z" --notes-file <notes>
+   ```
+
+2. Then bump the cask in the [`keremerkan/homebrew-tap`](https://github.com/keremerkan/homebrew-tap)
+   checkout: set `version` and `sha256` in `Casks/claudemon.rb`
+   (`shasum -a 256 dist/Claudemon.dmg`), commit as `claudemon X.Y.Z`, and push.
+   Do this only after step 1, so the cask never points at a DMG that isn't
+   published yet.
+
 ## Known limitations
 
 - **Only updates while running.** Claudemon has no background daemon; the
