@@ -23,20 +23,17 @@ struct ClaudemonWidgetView: View {
     }
 }
 
-// MARK: - Small: primary-limit ring + the next limit's percent
+// MARK: - Small: the primary limit's ring
 
-/// The ring shows `UsageReport.primary` (the session, or the all-models week
-/// for accounts without a session limit); the line below it shows the first
-/// remaining limit.
+/// Only the main limit, as a ring: `UsageReport.primary` (the session, or the
+/// all-models week for accounts without a session limit). The medium widget
+/// lists every limit.
 struct SmallUsageView: View {
     let report: UsageReport
     let capturedAt: Date?
     let isStale: Bool
 
     private var primary: UsageMetric? { report.primary }
-    private var ringPercent: Int { primary?.percent ?? 0 }
-    private var ringLabel: String { primary?.shortLabel ?? UsageMetric.Kind.session.shortName }
-    private var next: UsageMetric? { report.secondary.first }
 
     @Environment(\.showsRemainingUsage) private var showsRemaining
 
@@ -46,69 +43,35 @@ struct SmallUsageView: View {
     private static let footerDescent = -NSFont.preferredFont(forTextStyle: .callout).descender
 
     var body: some View {
-        // The ring sits at the top edge and the text block at the bottom edge,
-        // so both get the same widget content margin. The ring takes all the
-        // height the text doesn't need.
+        // The ring sits at the top edge and the "as of" line at the bottom
+        // edge, so both get the same widget content margin. The ring takes all
+        // the height the text doesn't need.
         VStack(spacing: 0) {
             ring
                 .padding(.top, Self.footerDescent)
                 .layoutPriority(1)
 
-            VStack(spacing: 2) {
-                if let next {
-                    HStack(spacing: 4) {
-                        Text(next.shortLabel)
-                            .font(.title3)
-                            .foregroundStyle(.secondary)
-                        Text("\(UsageDisplay.percent(next.percent, remaining: showsRemaining))%")
-                            .font(.title3.weight(.semibold).monospacedDigit())
-                            .foregroundStyle(UsageColor.color(for: next.percent))
-                    }
-                    .minimumScaleFactor(0.7)
-                    .lineLimit(1)
-                }
-
-                footerLine
-            }
-            // Claim the text's full height up front. Without this the stack
-            // only reserves its minimumScaleFactor height, hands the rest to
-            // the ring, then draws full-size text and overflows the margins.
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.top, 8)
+            footerLine
+                // Claim the text's full height up front. Without this the
+                // stack only reserves its minimumScaleFactor height, hands the
+                // rest to the ring, then draws full-size text and overflows.
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel([primary, next].compactMap { $0 }
-            .map { "\($0.shortLabel) \(UsageDisplay.spoken($0.percent, remaining: showsRemaining))" }
-            .joined(separator: ", "))
+        .accessibilityLabel(primary.map {
+            "\($0.shortLabel) \(UsageDisplay.spoken($0.percent, remaining: showsRemaining))"
+        } ?? "No usage data")
     }
 
-    /// Ring that scales to fill the available width using GeometryReader.
+    /// The shared ring gauge, scaled to fill the available square.
     private var ring: some View {
         GeometryReader { geo in
-            let diameter = min(geo.size.width, geo.size.height)
-            let lineWidth = max(diameter * 0.10, 4)
-            let percentFont = diameter * 0.30
-            let captionFont = diameter * 0.11
-
-            ZStack {
-                UsageRing(percent: ringPercent, lineWidth: lineWidth)
-                VStack(spacing: 1) {
-                    Text("\(UsageDisplay.percent(ringPercent, remaining: showsRemaining))%")
-                        .font(.system(size: percentFont, weight: .bold).monospacedDigit())
-                        .minimumScaleFactor(0.5)
-                        .lineLimit(1)
-                    Text(ringLabel)
-                        .font(.system(size: captionFont, weight: .medium))
-                        .textCase(.uppercase)
-                        .foregroundStyle(.secondary)
-                        .minimumScaleFactor(0.5)
-                        .lineLimit(1)
-                }
-                .padding(lineWidth)
-            }
-            .frame(width: diameter, height: diameter)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            UsageRingGauge(percent: primary?.percent,
+                           caption: primary?.shortLabel ?? UsageMetric.Kind.session.shortName,
+                           diameter: min(geo.size.width, geo.size.height))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .aspectRatio(1, contentMode: .fit)
     }

@@ -111,28 +111,79 @@ public struct VerticalUsageBar: View {
 /// inside its frame; a plain `.stroke` is centered on the path and would
 /// spill half the line width onto neighboring views.
 public struct UsageRing: View {
-    /// The limit's USED percentage.
-    private let percent: Int
+    /// The limit's USED percentage; nil (no data yet) draws only the track.
+    private let percent: Int?
     @Environment(\.showsRemainingUsage) private var showsRemaining
     private let lineWidth: CGFloat
 
-    public init(percent: Int, lineWidth: CGFloat) {
+    public init(percent: Int?, lineWidth: CGFloat) {
         self.percent = percent
         self.lineWidth = lineWidth
     }
 
     public var body: some View {
-        let shown = UsageDisplay.percent(percent, remaining: showsRemaining)
         ZStack {
             Circle()
                 .inset(by: lineWidth / 2)
                 .stroke(Color.primary.opacity(0.12), lineWidth: lineWidth)
-            Circle()
-                .inset(by: lineWidth / 2)
-                .trim(from: 0, to: CGFloat(shown) / 100)
-                .stroke(UsageColor.color(for: percent),
-                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                .rotationEffect(.degrees(-90))
+            if let percent {
+                Circle()
+                    .inset(by: lineWidth / 2)
+                    .trim(from: 0, to: CGFloat(UsageDisplay.percent(percent, remaining: showsRemaining)) / 100)
+                    .stroke(UsageColor.color(for: percent),
+                            style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
         }
+    }
+}
+
+/// A `UsageRing` with its shown percent over a caption inside ("73%" over
+/// "WEEK"), everything scaled from `diameter`. Shared by the floating window
+/// and the small widget. A nil percent (no data yet) shows `placeholderSymbol`
+/// in an empty ring.
+public struct UsageRingGauge: View {
+    /// The limit's USED percentage, or nil without data.
+    private let percent: Int?
+    private let caption: String
+    private let diameter: CGFloat
+    private let placeholderSymbol: String
+    @Environment(\.showsRemainingUsage) private var showsRemaining
+
+    public init(percent: Int?, caption: String, diameter: CGFloat,
+                placeholderSymbol: String = "ellipsis") {
+        self.percent = percent
+        self.caption = caption
+        self.diameter = diameter
+        self.placeholderSymbol = placeholderSymbol
+    }
+
+    public var body: some View {
+        let lineWidth = max(diameter * 0.105, 4)
+        let percentFont = diameter * 0.24
+        ZStack {
+            UsageRing(percent: percent, lineWidth: lineWidth)
+            VStack(spacing: 1) {
+                if let percent {
+                    Text("\(UsageDisplay.percent(percent, remaining: showsRemaining))%")
+                        .font(.system(size: percentFont, weight: .bold).monospacedDigit())
+                        .foregroundStyle(.primary)
+                } else {
+                    Image(systemName: placeholderSymbol)
+                        .font(.system(size: percentFont * 0.82, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
+                Text(caption)
+                    .font(.system(size: diameter * 0.115, weight: .medium))
+                    .textCase(.uppercase)
+                    .foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+            // Keep the text well inside the ring's opening: sized to the full
+            // inner width, "100%" ran into the stroke.
+            .frame(maxWidth: (diameter - 2 * lineWidth) * 0.78)
+        }
+        .frame(width: diameter, height: diameter)
     }
 }

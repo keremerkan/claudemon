@@ -4,10 +4,10 @@ Claudemon is a native macOS menu-bar app that shows your **Claude Code
 subscription usage live**. It reads the same limits the Claude Code CLI reports
 and surfaces them in three places:
 
-- a compact gauge + session percentage in the **menu bar** (with a
+- a compact gauge + the main limit's percentage in the **menu bar** (with a
   configurable style — icon + text, text only, or icon only),
-- an optional always-on-top **floating desktop window** (double-click to toggle
-  a **mini session-only view**), and
+- an optional always-on-top **floating desktop window** with a ring per limit
+  (double-click to toggle a **mini view** of just the main limit), and
 - a **Notification Center / desktop widget** (WidgetKit).
 
 It tracks the three limits Claude Code reports — **Current Session (5h)**,
@@ -34,10 +34,12 @@ becomes the main one: in the menu bar the one you pick as **Main limit**
 | :---: | :---: | :---: |
 | ![Menu bar panel](docs/menubar.png) | ![Floating desktop window](docs/floating.png) | ![Mini floating widget](docs/floating-mini.png) |
 
-The floating window has two forms: the **full view** (session ring + weekly bars
-+ reset footer) and a **mini view** that shows just the session ring. **Double-click
-the floating window** to switch between them — the mini view is a smaller,
-glanceable indicator that stays out of the way; double-click again to return.
+The floating window has two forms: the **full view** (a ring for every limit,
+the main one first, plus a reset footer) and a **mini view** that shows just
+the main limit's ring. **Double-click the floating window** to switch between
+them — the mini view is a smaller, glanceable indicator that stays out of the
+way; double-click again to return. The small desktop widget likewise shows
+only the main limit's ring; the medium one lists every limit.
 
 ## Menu bar style & settings
 
@@ -47,10 +49,10 @@ settings, then pick a **Menu bar style**:
 
 | Style | Shows | Notes |
 | --- | --- | --- |
-| **Icon + Text** | gauge icon + session percent (e.g. `◐ 28%`) | Default |
+| **Icon + Text** | gauge icon + main limit percent (e.g. `◐ 28%`) | Default |
 | **Text only** | just the percent (`28%`) | Smallest footprint that still shows the number |
 | **Icon only** | just the gauge icon | Tightest footprint |
-| **Bar graph** | a fixed-width session usage bar | Colored green/yellow/red like the in-app bars; options below |
+| **Bar graph** | a fixed-width usage bar for the main limit | Colored green/yellow/red like the in-app bars; options below |
 
 Choosing **Bar graph** reveals four extra options under the style picker:
 
@@ -90,7 +92,7 @@ available again. A window you never touched resets silently. Each alert
 point, including the reset announcement, can be toggled individually.
 
 **Precise bar fill** applies to every usage bar Claudemon draws — the menu-bar
-bar graph, the panel, the floating window, and the desktop widget. By default,
+bar graph, the panel, and the medium desktop widget. By default,
 bar fills are rounded and keep a small minimum size so low values still read as
 "some usage" at a glance — the trade-off is that 2% and 8% look almost the
 same. With precise fill on, fills are drawn straight-edged at their exact
@@ -173,7 +175,7 @@ and installs the same Developer ID signed + notarized app. Update later with
 4. Launch Claudemon from Applications (or Launchpad).
 
 There is **no Dock icon** — Claudemon lives in the **menu bar** (top-right of the
-screen). Look for the gauge with a session percentage, e.g. `◐ 28%`. Click it to
+screen). Look for the gauge with a percentage, e.g. `◐ 28%`. Click it to
 open the panel; click the **⚙︎ gear** in the panel header to reveal the settings,
 where you can choose the menu bar style, toggle the floating window, and enable
 "Launch at login." Once the floating window is on screen, **double-click it** to

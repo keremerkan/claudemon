@@ -2,9 +2,10 @@ import SwiftUI
 import ClaudemonCore
 
 /// Compact always-on-top widget content. Renders one of two forms:
-/// - LARGE: a ring for the primary limit + bars for the other limits + footer.
-/// - MINI:  just the ring (percent + "SESSION", or "WEEK" for accounts
-///          without a session limit; see `UsageReport.primary`).
+/// - LARGE: a ring per limit, the primary first (see `UsageReport.primary`
+///          and `.secondary`), above a footer.
+/// - MINI:  just the primary ring (percent + "SESSION", or "WEEK" for
+///          accounts without a session limit).
 /// Double-clicking the panel toggles between them (wired in the controller).
 struct FloatingWidgetView: View {
 
@@ -47,10 +48,7 @@ struct FloatingWidgetView: View {
                 onboardingContent
             } else {
                 VStack(spacing: 6) {
-                    HStack(spacing: 14) {
-                        primaryRing
-                        weeklyColumn
-                    }
+                    rings
                     footer
                 }
             }
@@ -65,7 +63,7 @@ struct FloatingWidgetView: View {
     /// A single, larger ring centered in a compact rounded-square panel.
     /// Reuses the exact ring rendering/colors of the large form.
     private var miniBody: some View {
-        ringView(diameter: 69, lineWidth: 7, percentFont: 18, labelFont: 8)
+        gauge(for: primary, diameter: 69)
             .panelChrome(size: Self.miniContentSize)
     }
 
@@ -88,77 +86,45 @@ struct FloatingWidgetView: View {
     }
 
     private var primary: UsageMetric? { store.primaryMetric }
-    private var primaryPercent: Int { primary?.percent ?? 0 }
 
     private var hasData: Bool { store.lastGoodReport != nil }
 
-    // MARK: - Ring
+    // MARK: - Rings
 
-    /// The large form's ring (preserved sizing).
-    private var primaryRing: some View {
-        ringView(diameter: 65, lineWidth: 7, percentFont: 17, labelFont: 8)
-    }
+    /// Room for the rings: the large form's width minus its horizontal
+    /// padding; the height left above the footer caps a ring at 65pt.
+    private static let ringsWidth = largeContentSize.width - 28
+    private static let maxRingDiameter: CGFloat = 65
+    private static let ringSpacing: CGFloat = 12
 
-    /// Shared ring rendering for the primary limit, used by both the large and
-    /// mini forms. Same track/trim/color logic; only the dimensions and type
-    /// scale differ.
-    private func ringView(
-        diameter: CGFloat,
-        lineWidth: CGFloat,
-        percentFont: CGFloat,
-        labelFont: CGFloat
-    ) -> some View {
-        ZStack {
-            UsageRing(percent: primaryPercent, lineWidth: lineWidth)
-            VStack(spacing: 1) {
-                if hasData {
-                    Text("\(store.shownPercent(primaryPercent))%")
-                        .font(.system(size: percentFont, weight: .bold).monospacedDigit())
-                        .foregroundStyle(.primary)
-                } else {
-                    Image(systemName: store.errorMessage != nil ? "exclamationmark.triangle" : "ellipsis")
-                        .font(.system(size: percentFont * 0.82, weight: .bold))
-                        .foregroundStyle(.secondary)
-                }
-                Text(primary?.shortLabel ?? UsageMetric.Kind.session.shortName)
-                    .font(.system(size: labelFont, weight: .medium))
-                    .textCase(.uppercase)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(width: diameter, height: diameter)
-    }
-
-    // MARK: - Right column
-
-    private var weeklyColumn: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            if let report = store.lastGoodReport {
-                ForEach(report.secondary) { metric in
-                    metricLine(label: metric.shortLabel, percent: metric.percent)
-                }
+    /// One ring per limit, primary first. Before any data arrives, a single
+    /// placeholder ring.
+    private var rings: some View {
+        let metrics = store.lastGoodReport.map { report in
+            [report.primary].compactMap { $0 } + report.secondary
+        } ?? []
+        let count = CGFloat(max(metrics.count, 1))
+        // Two rings fit at full size; three share the same width.
+        let diameter = min(Self.maxRingDiameter,
+                           (Self.ringsWidth - (count - 1) * Self.ringSpacing) / count)
+        return HStack(spacing: Self.ringSpacing) {
+            if metrics.isEmpty {
+                gauge(for: nil, diameter: diameter)
             } else {
-                metricLine(label: UsageMetric.Kind.weekAll.shortName, percent: nil)
-                metricLine(label: UsageMetric.Kind.weekModel.shortName, percent: nil)
+                ForEach(metrics) { gauge(for: $0, diameter: diameter) }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
     }
 
-    /// A labeled bar; a nil percent (no data yet) shows a dash and an empty bar.
-    private func metricLine(label: String, percent: Int?) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 4) {
-                Text(label)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 4)
-                Text(percent.map { "\(store.shownPercent($0))%" } ?? "—")
-                    .font(.system(size: 11, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(percent.map { UsageColor.color(for: $0) } ?? .secondary)
-            }
-            UsageBar(percent: percent ?? 0, height: 5, precise: store.preciseBars)
-        }
+    /// The shared ring gauge for a limit; nil shows the waiting/error state.
+    private func gauge(for metric: UsageMetric?, diameter: CGFloat) -> some View {
+        UsageRingGauge(
+            percent: metric?.percent,
+            caption: metric?.shortLabel ?? UsageMetric.Kind.session.shortName,
+            diameter: diameter,
+            placeholderSymbol: store.errorMessage != nil ? "exclamationmark.triangle" : "ellipsis"
+        )
     }
 
     // MARK: - Footer
@@ -196,9 +162,9 @@ struct FloatingWidgetView: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
-            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // Centered under the centered rings.
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private func footerTimeText(prefix: String) -> String {
