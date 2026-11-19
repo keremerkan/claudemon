@@ -213,7 +213,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     /// Fire at most one automatic update check per day. Kept off the launch
-    /// path with a detached Task so it never delays the menu-bar appearing.
+    /// path in a Task so it never delays the menu-bar appearing.
     private func maybeCheckForUpdates() {
         let key = "lastUpdateCheck"
         let now = Date()
@@ -227,7 +227,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // launch will naturally retry.
         Task { [updateChecker] in
             await updateChecker.check()
-            if case .failed = updateChecker.state { return }
+            if updateChecker.state == .failed { return }
             UserDefaults.standard.set(now, forKey: key)
         }
     }

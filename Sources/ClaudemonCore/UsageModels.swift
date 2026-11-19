@@ -81,7 +81,9 @@ public struct UsageMetric: Identifiable, Equatable, Codable, Sendable {
     }
 }
 
-/// A complete usage report containing the three known metrics.
+/// A usage report: the limits the CLI reported (session, all-models week,
+/// per-model week), in that order. Accounts without a session limit have no
+/// session metric.
 public struct UsageReport: Equatable, Codable, Sendable {
     public let metrics: [UsageMetric]
     /// When this report was produced (local device time).
@@ -163,16 +165,10 @@ public enum UsageFormatting {
         format(date, "MMM d", timeZone: timeZone)
     }
 
-    /// "HH:mm" wall-clock string (local timezone) used for the widget's
-    /// "as of" line.
-    public static func shortClockString(_ date: Date) -> String {
-        shortClockString(date, timeZone: nil)
-    }
-
-    /// "HH:mm" wall-clock string in the supplied timezone (falls back to the
-    /// current timezone when nil). Used for the widget's "resets at" suffix so
-    /// the time matches the panel's reset basis (the metric's own timezone).
-    public static func shortClockString(_ date: Date, timeZone: TimeZone?) -> String {
+    /// "HH:mm" wall-clock string in the supplied timezone, the current one by
+    /// default: the "updated" times use local time, the "resets at" hints the
+    /// metric's own timezone (matching the panel's reset basis).
+    public static func shortClockString(_ date: Date, timeZone: TimeZone? = nil) -> String {
         format(date, "HH:mm", timeZone: timeZone)
     }
 

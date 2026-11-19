@@ -23,12 +23,10 @@ final class UsageStore {
     enum Diagnostic: Equatable {
         case notInstalled   // claude binary not found anywhere → onboarding
         case notSignedIn    // claude present but not logged in / no subscription
-        case other(String)  // any other genuine error (timeout, launch, etc.)
+        case other          // any other genuine error (timeout, launch, etc.)
     }
 
     private(set) var state: State = .loading
-    /// Timestamp of the last SUCCESSFUL capture (the data currently shown).
-    private(set) var lastUpdated: Date?
     private(set) var isRefreshing: Bool = false
     /// The current classified diagnostic, if the latest poll genuinely failed.
     /// nil while loading, fresh, or in a calm stale-render.
@@ -70,8 +68,8 @@ final class UsageStore {
     // Sub-options for the `.bars` menu-bar style. Only consulted when that
     // style is active; persisted individually so they survive style switches.
 
-    /// Show the weekly (all models) limit as a second bar under/next to the
-    /// session bar.
+    /// Show a weekly limit (see `menuBarWeekBarSource`) as a second bar
+    /// under/next to the session bar.
     var menuBarShowsWeekBar: Bool {
         didSet {
             defaults.set(menuBarShowsWeekBar, forKey: Self.menuBarShowsWeekBarKey)
@@ -254,11 +252,6 @@ final class UsageStore {
         guard case .loading = state else { return }
         guard let cached = cache.read(), let report = cached.report else { return }
         state = .staleRender(report)
-        // Use the report's own capture time (NOT cached.writtenAt). For a stale
-        // cache, writtenAt is stamped at the last FAILURE, which would make old
-        // data look freshly updated and suppress the "· stale" footer hint.
-        // Matching applySuccess keeps lastUpdated an honest "last capture" time.
-        lastUpdated = report.capturedAt
         // Push the primed content to the widget too. The rate-limit keys
         // "changed" off the metric snapshot, so this reloads only when the cache
         // content differs from what the widget was last told (e.g. on launch).
@@ -304,20 +297,30 @@ final class UsageStore {
         // execute on the main thread (would hang the menu-bar UI on first
         // launch / after wake). Only the result is marshalled back.
         currentTask = Task.detached(priority: .utility) { [weak self] in
+            let result: Result<UsageReport, Error>
             do {
-                let data = try await UsageFetcher.fetchUsageJSON()
-                let report = try UsageParser.parse(jsonData: data)
-                try Task.checkCancellation()
-                await self?.applySuccess(report)
-            } catch is CancellationError {
-                await self?.refreshCancelled()
-            } catch let parseError as UsageParseError where parseError.isStaleRender {
-                // SUCCESS body that simply lacked the limit lines this cycle.
-                // Not a failure: keep last-good data, no alarming error.
-                await self?.applyStaleRender()
+                result = .success(try UsageParser.parse(jsonData: try await UsageFetcher.fetchUsageJSON()))
             } catch {
-                await self?.applyFailure(error)
+                result = .failure(error)
             }
+            await self?.finishRefresh(result)
+        }
+    }
+
+    private func finishRefresh(_ result: Result<UsageReport, Error>) {
+        // stop() cancelled this refresh and reset the in-flight flag itself.
+        // The fetch still runs to its end, so drop the late result: it must
+        // not touch state a newer refresh may already own.
+        guard !Task.isCancelled else { return }
+        switch result {
+        case .success(let report):
+            applySuccess(report)
+        case .failure(let parseError as UsageParseError) where parseError.isStaleRender:
+            // SUCCESS body that simply lacked the limit lines this cycle.
+            // Not a failure: keep last-good data, no alarming error.
+            applyStaleRender()
+        case .failure(let error):
+            applyFailure(error)
         }
     }
 
@@ -330,7 +333,6 @@ final class UsageStore {
 
         state = .loaded(report)
         diagnostic = nil
-        lastUpdated = report.capturedAt
         isRefreshing = false
 
         // Fire usage-limit alerts on genuinely fresh data only (never on
@@ -344,7 +346,7 @@ final class UsageStore {
         reloadWidgetIfNeeded(for: report)
     }
 
-    /// The CLI returned a real body but without the three limit lines (it only
+    /// The CLI returned a real body but without the limit lines (it only
     /// refreshes them on its own ~1-minute cadence). Keep last-good data and
     /// show a CALM state — never an error. Schedule a sooner follow-up poll to
     /// catch the next refresh window without hammering the CLI.
@@ -355,10 +357,9 @@ final class UsageStore {
             consecutiveColdNoMetrics = 0
             state = .staleRender(report)
             // Keep the cache "ok" with the last-good data; this isn't an error.
-            // Preserve the ORIGINAL capture time so the widget's "as of" stays
-            // honest (we did not get newer data this tick).
-            cache.write(CachedUsage(report: report, state: .ok,
-                                    errorMessage: nil, writtenAt: report.capturedAt))
+            // The report keeps its original capture time, so the widget's
+            // "updated" line stays honest (no newer data this tick).
+            cache.writeSuccess(report)
             // Reload on this warm path too, not only on applySuccess. The
             // snapshot-based rate-limit makes this a no-op when the content is
             // unchanged, so genuinely-new last-good data still reaches the widget
@@ -377,9 +378,9 @@ final class UsageStore {
             if consecutiveColdNoMetrics >= maxColdNoMetrics,
                elapsed >= minColdEscalationDelay {
                 let message = "Couldn't read usage. Try Refresh, or relaunch Claudemon."
-                diagnostic = .other(message)
+                diagnostic = .other
                 state = .error(message)
-                cache.writeError(message)
+                cache.writeError()
             } else {
                 diagnostic = nil   // calm: not an error yet
                 state = .loading
@@ -389,12 +390,6 @@ final class UsageStore {
         scheduleAcceleratedFollowUpIfNeeded()
     }
 
-    /// Called when an in-flight refresh was cancelled (e.g. by stop()/sleep).
-    /// Resets the in-flight flag so future refreshes are not blocked.
-    private func refreshCancelled() {
-        isRefreshing = false
-    }
-
     private func applyFailure(_ error: Error) {
         consecutiveColdNoMetrics = 0
         let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -402,10 +397,10 @@ final class UsageStore {
         // Preserve last good data as a (real) error-stale, if we have any.
         if let report = lastGoodReport {
             state = .staleError(report, error: message)
-            cache.writeStale(report, error: message)
+            cache.writeStale(report)
         } else {
             state = .error(message)
-            cache.writeError(message)
+            cache.writeError()
         }
         isRefreshing = false
         // Do not force a widget reload on transient failures; the widget keeps
@@ -413,14 +408,11 @@ final class UsageStore {
     }
 
     /// Map a fetch error to a user-facing diagnostic category.
-    static func classify(_ error: Error) -> Diagnostic {
-        guard let fetchError = error as? UsageFetchError else {
-            return .other((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
-        }
-        switch fetchError {
+    private static func classify(_ error: Error) -> Diagnostic {
+        switch error as? UsageFetchError {
         case .claudeNotFound: return .notInstalled
         case .notSignedIn: return .notSignedIn
-        default: return .other(fetchError.errorDescription ?? "Couldn't read usage")
+        default: return .other
         }
     }
 
@@ -490,24 +482,15 @@ final class UsageStore {
     /// Claude is present but the user needs to sign in.
     var isNotSignedIn: Bool { diagnostic == .notSignedIn }
 
-    /// True when we have no usable data AND a genuine failure to explain.
-    var hasNoData: Bool { lastGoodReport == nil }
+    /// When the shown data was captured: the last SUCCESSFUL fetch, never the
+    /// time of a later failed one.
+    var lastUpdated: Date? { lastGoodReport?.capturedAt }
 
-    /// How long ago the currently-shown data was captured, if any.
-    var dataAge: TimeInterval? {
-        lastUpdated.map { Date().timeIntervalSince($0) }
-    }
-
-    /// A calm footer string for surfaces that show last-good data.
-    /// e.g. "updated 14:32", optionally a muted "· stale" hint when the shown
-    /// data is older than ~10 minutes. Never alarming.
-    func calmFooterText(now: Date = Date()) -> String? {
-        guard let updated = lastUpdated else { return nil }
-        var text = "updated \(UsageFormatting.shortClockString(updated))"
-        if now.timeIntervalSince(updated) > 10 * 60 {
-            text += " · stale"
-        }
-        return text
+    /// A muted " · stale" footer suffix once the shown data is over 10
+    /// minutes old; empty before that. Never alarming.
+    func staleHint(now: Date = Date()) -> String {
+        guard let lastUpdated, now.timeIntervalSince(lastUpdated) > 10 * 60 else { return "" }
+        return " · stale"
     }
 
     /// The headline limit for the floating window (see `UsageReport.primary`).

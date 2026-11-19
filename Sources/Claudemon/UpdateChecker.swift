@@ -21,7 +21,7 @@ final class UpdateChecker {
         case checking
         case upToDate(current: String)
         case updateAvailable(latest: String, url: URL)
-        case failed(String)
+        case failed
     }
 
     private(set) var state: State = .idle
@@ -51,7 +51,7 @@ final class UpdateChecker {
 
         guard let endpoint = URL(string: Self.latestReleaseEndpoint) else {
             updateLog.error("update check endpoint URL is invalid")
-            state = .failed("Couldn't check for updates")
+            state = .failed
             return
         }
         var request = URLRequest(url: endpoint)
@@ -64,7 +64,7 @@ final class UpdateChecker {
 
             if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
                 updateLog.error("update check got HTTP \(http.statusCode, privacy: .public)")
-                state = .failed("Couldn't check for updates")
+                state = .failed
                 return
             }
 
@@ -73,7 +73,7 @@ final class UpdateChecker {
 
             guard let latest = SemVer(latestTag), let current = SemVer(currentVersion) else {
                 updateLog.error("update check couldn't parse versions (latest: \(latestTag, privacy: .public), current: \(self.currentVersion, privacy: .public))")
-                state = .failed("Couldn't check for updates")
+                state = .failed
                 return
             }
 
@@ -86,7 +86,7 @@ final class UpdateChecker {
             }
         } catch {
             updateLog.error("update check failed: \(error.localizedDescription, privacy: .public)")
-            state = .failed("Couldn't check for updates")
+            state = .failed
         }
     }
 }

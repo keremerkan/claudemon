@@ -122,6 +122,19 @@ struct UsageParserTests {
         #expect(c.day == 5)
     }
 
+    /// Regression: a reset read moments after it happened (the poll lands in
+    /// the minute after 2:49am) used to roll to next year and show a countdown
+    /// of about 8760 hours. A date that only just passed stays this year.
+    @Test func `A reset that just passed stays this year`() throws {
+        let now = makeDate(2026, 6, 24, 2, 50)
+        let text = "Current session: 10% used · resets Jun 24 at 2:49am (Europe/Istanbul)"
+        let report = try UsageParser.parse(resultText: text, now: now)
+        let c = components(of: try #require(report.session?.resetDate), tz: "Europe/Istanbul")
+        #expect(c.year == 2026, "A reset a minute ago is this year's, not next year's")
+        #expect(c.month == 6)
+        #expect(c.day == 24)
+    }
+
     @Test func `A future month and day stays this year`() throws {
         // now = Jan 2026. Reset "Dec 31" is later this year → stays 2026.
         let now = makeDate(2026, 1, 10, 12, 0)

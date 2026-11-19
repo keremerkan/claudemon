@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// How the menu-bar label presents the live usage (the report's primary limit). Persisted by
-/// `UsageStore` as a raw string and chosen by the user in the settings footer.
+/// How the menu-bar label presents the live usage (its main limit). Persisted
+/// by `UsageStore` as a raw string and chosen in the panel's settings.
 public enum MenuBarDisplayMode: String, CaseIterable, Identifiable, Sendable {
     case iconAndText
     case textOnly
@@ -42,8 +42,8 @@ public enum MenuBarWeekBarSource: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Fixed-size bar-graph content for the menu-bar label: the primary limit (the
-/// session, or the all-models week for accounts without one) as a bar,
+/// Fixed-size bar-graph content for the menu-bar label: the main limit (the
+/// session, or the user's Main limit for accounts without one) as a bar,
 /// optionally a weekly limit as a second bar, and
 /// optionally the percent value(s) beside the bars. Bars use the shared
 /// `UsageColor` thresholds so they match the in-app usage bars.
@@ -54,10 +54,9 @@ public enum MenuBarWeekBarSource: String, CaseIterable, Identifiable, Sendable {
 /// stable size so the menu-bar item never jitters as values change.
 public struct MenuBarBarsView: View {
 
-    /// Everything that affects the rendered pixels, grouped so the app can
-    /// compare configurations cheaply when deciding whether to re-render.
-    public struct Configuration: Equatable {
-        /// The report's primary limit (see `UsageReport.primary`).
+    /// Everything that affects the rendered pixels.
+    public struct Configuration {
+        /// The menu bar's main limit (see `UsageStore.menuBarPrimaryMetric`).
         public var primaryPercent: Int
         /// The second bar's weekly percent; nil renders the primary bar only.
         public var weekPercent: Int?
@@ -134,11 +133,11 @@ public struct MenuBarBarsView: View {
 
     private var verticalBars: some View {
         HStack(spacing: 3) {
-            VerticalUsageBar(percent: config.primaryPercent, width: barThickness,
+            UsageBar.vertical(percent: config.primaryPercent, width: barThickness,
                              precise: config.preciseFill)
                 .frame(height: Self.contentHeight)
             if let week = config.weekPercent {
-                VerticalUsageBar(percent: week, width: barThickness,
+                UsageBar.vertical(percent: week, width: barThickness,
                                  precise: config.preciseFill)
                     .frame(height: Self.contentHeight)
             }

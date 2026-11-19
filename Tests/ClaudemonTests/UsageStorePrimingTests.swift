@@ -47,10 +47,9 @@ struct UsageStorePrimingTests {
     /// With a valid cached report, a freshly-started store exposes that report
     /// as last-good (and a calm stale-render state) BEFORE any live fetch runs.
     @Test func `Priming from cache seeds the last-good report`() {
-        let writtenAt = makeDate(2026, 6, 23, 12, 1, 30)
         let cache = makeCache()
         let report = sampleReport()
-        cache.write(CachedUsage(report: report, state: .ok, errorMessage: nil, writtenAt: writtenAt))
+        cache.writeSuccess(report)
 
         let store = makeStore(cache)
         // Sanity: nothing seeded yet.
@@ -64,23 +63,19 @@ struct UsageStorePrimingTests {
         #expect(store.state == .staleRender(report), "Primed state must be a calm stale-render")
         #expect(store.lastUpdated == report.capturedAt,
                 "lastUpdated must reflect the report's own capture time, not the cache write time")
-        #expect(store.lastUpdated != writtenAt,
-                "lastUpdated must NOT be the cache write timestamp (which is the last failure time for stale caches)")
         #expect(store.errorMessage == nil, "Priming must never look like an error")
-        #expect(!store.hasNoData)
     }
 
     /// Priming from a stale cache whose report was captured long ago must surface
-    /// the OLD capture time as `lastUpdated`, so the existing stale-detection
-    /// (`dataAge` > 10 min, driving the "· stale" footer hint) correctly fires.
-    /// The cache's `writtenAt` here is "now" (it is stamped at the last failure),
-    /// which must NOT be mistaken for a fresh update.
-    @Test func `Priming from a stale cache reflects the old capture time`() throws {
+    /// the OLD capture time as `lastUpdated`, so the stale detection
+    /// (`staleHint`, the "· stale" footer suffix past 10 minutes) fires.
+    /// The cache file itself was written just now (at the last failure), which
+    /// must NOT be mistaken for a fresh update.
+    @Test func `Priming from a stale cache reflects the old capture time`() {
         // Floor to whole seconds so the dates survive the cache's `.iso8601`
         // round-trip (which truncates sub-second precision) and compare exactly.
         let now = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded(.down))
-        // Report captured 30 minutes ago, but the stale cache was written "now"
-        // (writeStale stamps writtenAt: Date() on the last failure).
+        // Report captured 30 minutes ago, but the stale cache is written now.
         let oldCapture = now.addingTimeInterval(-30 * 60)
         let session = UsageMetric(
             kind: .session, rawLabel: "Current session", percent: 27,
@@ -89,18 +84,17 @@ struct UsageStorePrimingTests {
         let report = UsageReport(metrics: [session], capturedAt: oldCapture)
 
         let cache = makeCache()
-        cache.write(CachedUsage(report: report, state: .stale,
-                                errorMessage: "Couldn't read usage", writtenAt: now))
+        cache.writeStale(report)
 
         let store = makeStore(cache)
         store.primeFromCache()
 
         #expect(store.lastUpdated == oldCapture,
                 "lastUpdated must be the report's old capture time, not the failure write time")
-        let age = try #require(store.dataAge)
-        #expect(age > 10 * 60, "Old primed data must be detected as stale (> 10 min)")
-        #expect(store.calmFooterText(now: now) == "updated \(UsageFormatting.shortClockString(oldCapture)) · stale",
+        #expect(store.staleHint(now: now) == " · stale",
                 "The stale footer hint must fire for genuinely old primed data")
+        #expect(store.staleHint(now: oldCapture.addingTimeInterval(10 * 60)).isEmpty,
+                "Data exactly 10 minutes old is not stale yet")
     }
 
     /// With no cache present, priming is a no-op and the store stays loading.
@@ -119,7 +113,7 @@ struct UsageStorePrimingTests {
     /// `lastGoodReport` after priming is exactly what makes that branch hold.
     @Test func `Primed report survives the stale-render branch`() {
         let cache = makeCache()
-        cache.write(CachedUsage(report: sampleReport(), state: .ok, errorMessage: nil, writtenAt: Date()))
+        cache.writeSuccess(sampleReport())
 
         let store = makeStore(cache)
         store.primeFromCache()
@@ -142,7 +136,7 @@ struct UsageStorePrimingTests {
         if includesModelWeek { metrics.append(metric(.weekModel, "Current week (Fable)", 53)) }
         let report = UsageReport(metrics: metrics, capturedAt: makeDate(2026, 11, 18, 10, 0))
         let cache = makeCache()
-        cache.write(CachedUsage(report: report, state: .ok, errorMessage: nil, writtenAt: report.capturedAt))
+        cache.writeSuccess(report)
         let store = makeStore(cache)
         store.primeFromCache()
         return store

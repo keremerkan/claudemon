@@ -55,7 +55,6 @@ struct SharedUsageCacheTests {
         let cached = try #require(cache.read(), "Reading back a freshly-written cache must succeed")
 
         #expect(cached.state == .ok)
-        #expect(cached.errorMessage == nil)
 
         let readReport = try #require(cached.report)
         #expect(readReport.metrics.count == 3)
@@ -83,39 +82,27 @@ struct SharedUsageCacheTests {
     @Test func `Write state is preserved across the round-trip`() throws {
         let report = sampleReport()
 
-        cache.writeStale(report, error: "poll failed")
+        cache.writeStale(report)
         let cached = try #require(cache.read())
 
         #expect(cached.state == .stale, "State flag must survive the round-trip")
-        #expect(cached.errorMessage == "poll failed")
         #expect(cached.report == report)
     }
 
     @Test func `Error write has a nil report and error state`() throws {
-        cache.writeError("boom")
+        cache.writeError()
         let cached = try #require(cache.read())
 
         #expect(cached.state == .error)
-        #expect(cached.errorMessage == "boom")
         #expect(cached.report == nil, "An error write should carry no report")
     }
 
-    @Test func `writtenAt survives the round-trip`() throws {
-        let writtenAt = makeDate(2026, 6, 23, 22, 30, 15, tz: "Europe/Istanbul")
-        let payload = CachedUsage(report: sampleReport(), state: .ok, errorMessage: nil, writtenAt: writtenAt)
-
-        cache.write(payload)
-        let cached = try #require(cache.read())
-        #expect(cached.writtenAt == writtenAt)
-    }
-
     @Test func `A write overwrites the previous payload`() throws {
-        cache.writeError("first")
+        cache.writeError()
         cache.writeSuccess(sampleReport())
 
         let cached = try #require(cache.read())
         #expect(cached.state == .ok, "Latest atomic write should win")
-        #expect(cached.errorMessage == nil)
         #expect(cached.report != nil)
     }
 

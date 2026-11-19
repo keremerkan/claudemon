@@ -52,16 +52,6 @@ public enum CachedUsageState: String, Codable, Sendable {
 public struct CachedUsage: Codable, Sendable {
     public let report: UsageReport?
     public let state: CachedUsageState
-    public let errorMessage: String?
-    /// When the cache file was last written (device local time).
-    public let writtenAt: Date
-
-    public init(report: UsageReport?, state: CachedUsageState, errorMessage: String?, writtenAt: Date) {
-        self.report = report
-        self.state = state
-        self.errorMessage = errorMessage
-        self.writtenAt = writtenAt
-    }
 }
 
 /// Reads/writes the latest `UsageReport` (as JSON) into the App Group container
@@ -70,34 +60,13 @@ public struct SharedUsageCache: Sendable {
 
     public static let shared = SharedUsageCache()
 
-    private let groupID: String
-    private let fileName = "usage-cache.json"
+    private static let fileName = "usage-cache.json"
 
-    /// Optional explicit base directory. When set (tests/CLI), the cache reads
-    /// and writes directly under this directory instead of resolving the App
-    /// Group container. Production always leaves this nil so the real App Group
-    /// container path is used.
-    private let baseDirectory: URL?
+    /// The cache file, or nil when the App Group container can't be resolved.
+    private let fileURL: URL?
 
-    public init(groupID: String = claudemonAppGroupID) {
-        self.groupID = groupID
-        self.baseDirectory = nil
-    }
-
-    /// Testable initializer that injects an explicit base directory (e.g. a temp
-    /// dir) so round-trips can be verified without the App Group entitlement.
-    /// Not used by production code paths.
-    init(baseDirectory: URL, groupID: String = claudemonAppGroupID) {
-        self.groupID = groupID
-        self.baseDirectory = baseDirectory
-    }
-
-    /// URL of the cache file inside the App Group container (or the injected
-    /// base directory in tests), if available.
-    private var fileURL: URL? {
-        if let baseDirectory {
-            return baseDirectory.appendingPathComponent(fileName, conformingTo: .json)
-        }
+    /// The cache in the App Group container (production).
+    public init() {
         // Resolve the ONE canonical App Group container. The non-sandboxed app
         // (writer) and the sandboxed widget (reader) run this identical logic, so
         // they converge on the exact same directory. There is deliberately no
@@ -105,28 +74,31 @@ public struct SharedUsageCache: Sendable {
         // reader land in different containers, leaving the widget frozen on a
         // stale file.
         guard let container = FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: groupID) else {
-            // Loud signal: a real (non-test) run could not resolve the canonical
-            // container, so the widget cache will not be shared. This surfaces
-            // signing/entitlement regressions instead of silently producing an
-            // empty (or stale) widget. We do NOT fall back to another container.
+            .containerURL(forSecurityApplicationGroupIdentifier: claudemonAppGroupID) else {
+            // Loud signal: the canonical container could not be resolved, so
+            // the widget cache will not be shared. This surfaces signing or
+            // entitlement regressions instead of silently producing an empty
+            // (or stale) widget. We do NOT fall back to another container.
             sharedUsageCacheLogger.error(
-                "App Group container could not be resolved for \(self.groupID, privacy: .public); widget cache will not be shared."
+                "App Group container could not be resolved for \(claudemonAppGroupID, privacy: .public); widget cache will not be shared."
             )
-            return nil
+            fileURL = nil
+            return
         }
-        // Debug-level: fine to emit on every call (not persisted by default).
-        sharedUsageCacheLogger.debug(
-            "App Group container resolved for \(self.groupID, privacy: .public)"
-        )
-        return container.appendingPathComponent(fileName, conformingTo: .json)
+        fileURL = container.appendingPathComponent(Self.fileName, conformingTo: .json)
+    }
+
+    /// A cache in an explicit directory (e.g. a temp dir), so tests can verify
+    /// round-trips without the App Group entitlement.
+    init(baseDirectory: URL) {
+        fileURL = baseDirectory.appendingPathComponent(Self.fileName, conformingTo: .json)
     }
 
     // MARK: - Write (app side)
 
     /// Persist a cache payload. Silently no-ops if the container is unavailable
     /// (e.g. running unsandboxed without the entitlement).
-    public func write(_ cached: CachedUsage) {
+    private func write(_ cached: CachedUsage) {
         guard let url = fileURL else { return }
         do {
             let encoder = JSONEncoder()
@@ -138,19 +110,20 @@ public struct SharedUsageCache: Sendable {
         }
     }
 
-    /// Convenience for a successful poll.
+    /// The app's data is current: a fresh poll, or last-good data the CLI had
+    /// nothing newer for.
     public func writeSuccess(_ report: UsageReport) {
-        write(CachedUsage(report: report, state: .ok, errorMessage: nil, writtenAt: Date()))
+        write(CachedUsage(report: report, state: .ok))
     }
 
-    /// Convenience for a stale state (keep last-good data + note the error).
-    public func writeStale(_ report: UsageReport, error: String) {
-        write(CachedUsage(report: report, state: .stale, errorMessage: error, writtenAt: Date()))
+    /// The latest poll failed; keep the last-good data.
+    public func writeStale(_ report: UsageReport) {
+        write(CachedUsage(report: report, state: .stale))
     }
 
-    /// Convenience for an error with no data.
-    public func writeError(_ error: String) {
-        write(CachedUsage(report: nil, state: .error, errorMessage: error, writtenAt: Date()))
+    /// The latest poll failed and there is no data to show.
+    public func writeError() {
+        write(CachedUsage(report: nil, state: .error))
     }
 
     // MARK: - Read (widget side)

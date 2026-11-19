@@ -6,10 +6,11 @@ import ClaudemonCore
 
 struct UsageEntry: TimelineEntry {
     let date: Date
-    /// The cached report, or nil when no cache is available yet.
+    /// The cached report, or nil when no cache is available yet. Its own
+    /// capture time drives the "updated" line: after a failed fetch the app
+    /// rewrites the cache with the old report, so the cache's write time would
+    /// name the failure, not the data.
     let report: UsageReport?
-    /// When the shown data was captured (for the "updated" line).
-    let capturedAt: Date?
     let isStale: Bool
     /// Exact straight-edged bar fills (app setting, shared via the App Group
     /// defaults suite).
@@ -25,7 +26,7 @@ struct UsageProvider: TimelineProvider {
     private let cache = SharedUsageCache.shared
 
     func placeholder(in context: Context) -> UsageEntry {
-        UsageEntry(date: Date(), report: Self.sampleReport, capturedAt: Date(),
+        UsageEntry(date: Date(), report: Self.sampleReport,
                    isStale: false, preciseBars: false, showsRemaining: false)
     }
 
@@ -46,16 +47,12 @@ struct UsageProvider: TimelineProvider {
         let precise = SharedPreference.preciseBars.read()
         let remaining = SharedPreference.showsRemaining.read()
         guard let cached = cache.read() else {
-            return UsageEntry(date: Date(), report: nil, capturedAt: nil,
+            return UsageEntry(date: Date(), report: nil,
                               isStale: false, preciseBars: precise, showsRemaining: remaining)
         }
         return UsageEntry(
             date: Date(),
             report: cached.report,
-            // The report's own capture time, not the cache write time: after
-            // a failed fetch the app rewrites the cache with the old report,
-            // and "last update" must name when that data was captured.
-            capturedAt: cached.report?.capturedAt,
             isStale: cached.state != .ok,
             preciseBars: precise,
             showsRemaining: remaining
@@ -92,7 +89,7 @@ struct ClaudemonRingsWidget: Widget {
         StaticConfiguration(kind: claudemonRingsWidgetKind, provider: UsageProvider()) { entry in
             Group {
                 if let report = entry.report {
-                    RingsUsageView(report: report, capturedAt: entry.capturedAt, isStale: entry.isStale)
+                    RingsUsageView(report: report, isStale: entry.isStale)
                 } else {
                     EmptyUsageView()
                 }

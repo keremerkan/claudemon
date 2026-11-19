@@ -53,7 +53,6 @@ final class NotificationManager {
     /// Master on/off switch for all usage alerts.
     var isEnabled: Bool {
         didSet {
-            guard didLoad else { return }
             defaults.set(isEnabled, forKey: Self.masterDefaultsKey)
             if isEnabled { requestAuthorizationIfNeeded() }
         }
@@ -63,7 +62,6 @@ final class NotificationManager {
     /// had any usage). Defaults to on.
     var resetAlertsEnabled: Bool {
         didSet {
-            guard didLoad else { return }
             defaults.set(resetAlertsEnabled, forKey: Self.resetDefaultsKey)
         }
     }
@@ -79,7 +77,6 @@ final class NotificationManager {
 
     private let defaults: UserDefaults
     private let center = UNUserNotificationCenter.current()
-    @ObservationIgnored private var didLoad = false
 
     /// Per-metric record of which thresholds have already fired in the current
     /// quota window (keyed by `UsageMetric.Kind.rawValue`).
@@ -119,7 +116,6 @@ final class NotificationManager {
             self.firedState = [:]
         }
 
-        didLoad = true
         if isEnabled { refreshAuthorizationStatus() }
     }
 
@@ -165,7 +161,8 @@ final class NotificationManager {
             )
 
             if let threshold = decision.fire {
-                post(threshold: threshold, metric: metric)
+                post(subtitle: metric.displayLabel, body: threshold.bodyText,
+                     id: "\(key).\(threshold.rawValue)")
             }
             firedState[key] = FiredEntry(signature: decision.signature, fired: decision.fired)
 
@@ -180,7 +177,7 @@ final class NotificationManager {
             resetState[key] = resetDecision.state
             resetLabels[key] = metric.displayLabel
             if resetAlertsEnabled, resetDecision.fireReset {
-                postReset(label: metric.displayLabel, kind: metric.kind)
+                postReset(label: metric.displayLabel, key: key)
             }
         }
 
@@ -196,7 +193,7 @@ final class NotificationManager {
                 now: report.capturedAt, resetDate: nil, percentUsed: 0, prior: prior)
             resetState[key] = resetDecision.state
             if resetAlertsEnabled, resetDecision.fireReset {
-                postReset(label: resetLabels[key] ?? kind.displayName, kind: kind)
+                postReset(label: resetLabels[key] ?? kind.displayName, key: key)
             }
         }
 
@@ -211,29 +208,21 @@ final class NotificationManager {
 
     // MARK: - Posting
 
-    private func post(threshold: Threshold, metric: UsageMetric) {
-        let content = UNMutableNotificationContent()
-        content.title = "Claudemon"
-        content.subtitle = metric.displayLabel
-        content.body = threshold.bodyText
-        content.sound = .default
-
-        // Unique id per fire so banners stack rather than coalesce.
-        let id = "claudemon.\(metric.kind.rawValue).\(threshold.rawValue).\(UUID().uuidString)"
-        let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
-        center.add(request, withCompletionHandler: nil)
+    private func postReset(label: String, key: String) {
+        post(subtitle: label, body: resetAlertBodyText, id: "reset.\(key)")
     }
 
-    private func postReset(label: String, kind: UsageMetric.Kind) {
+    /// Post a banner now. The metric name goes in the subtitle; `id` names
+    /// the alert, and a UUID is appended so banners stack rather than coalesce.
+    private func post(subtitle: String, body: String, id: String) {
         let content = UNMutableNotificationContent()
         content.title = "Claudemon"
-        content.subtitle = label
-        content.body = resetAlertBodyText
+        content.subtitle = subtitle
+        content.body = body
         content.sound = .default
 
-        // Unique id per fire so banners stack rather than coalesce.
-        let id = "claudemon.reset.\(kind.rawValue).\(UUID().uuidString)"
-        let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
+        let request = UNNotificationRequest(identifier: "claudemon.\(id).\(UUID().uuidString)",
+                                            content: content, trigger: nil)
         center.add(request, withCompletionHandler: nil)
     }
 

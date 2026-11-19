@@ -96,19 +96,12 @@ struct UsageModelsCodableTests {
             ],
             capturedAt: makeDate(2026, 6, 23, 12, 0, tz: "Europe/Istanbul")
         )
-        let payload = CachedUsage(
-            report: report,
-            state: .stale,
-            errorMessage: "network down",
-            writtenAt: makeDate(2026, 6, 23, 22, 30, 15, tz: "Europe/Istanbul")
-        )
+        let payload = CachedUsage(report: report, state: .stale)
 
         let data = try encoder.encode(payload)
         let decoded = try decoder.decode(CachedUsage.self, from: data)
 
         #expect(decoded.state == .stale)
-        #expect(decoded.errorMessage == "network down")
-        #expect(decoded.writtenAt == payload.writtenAt)
         #expect(decoded.report == report)
     }
 

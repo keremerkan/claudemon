@@ -105,10 +105,10 @@ struct MenuPanelView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            installCommand("npm install -g @anthropic-ai/claude-code")
-            if let downloadURL = URL(string: "https://claude.ai/download") {
-                Link(destination: downloadURL) {
-                    Label("Get Claude Code", systemImage: "arrow.up.right.square")
+            installCommand("curl -fsSL https://claude.ai/install.sh | bash")
+            if let setupURL = URL(string: "https://code.claude.com/docs/en/setup") {
+                Link(destination: setupURL) {
+                    Label("Other ways to install", systemImage: "arrow.up.right.square")
                         .font(.caption)
                 }
             }
@@ -140,7 +140,8 @@ struct MenuPanelView: View {
                 .font(.system(.caption, design: .monospaced))
                 .textSelection(.enabled)
                 .lineLimit(1)
-                .truncationMode(.tail)
+                // The longest command is a little wider than the panel.
+                .minimumScaleFactor(0.8)
             Spacer(minLength: 6)
             Button {
                 NSPasteboard.general.clearContents()
@@ -179,17 +180,11 @@ struct MenuPanelView: View {
             if notifications.isEnabled {
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(NotificationManager.Threshold.allCases, id: \.rawValue) { threshold in
-                        Toggle(threshold.settingsLabel,
-                               isOn: $notifications[thresholdEnabled: threshold])
-                        .toggleStyle(.checkbox)
-                        .controlSize(.small)
-                        .font(.caption)
+                        checkboxToggle(threshold.settingsLabel,
+                                       isOn: $notifications[thresholdEnabled: threshold])
                     }
 
-                    Toggle("When a limit resets", isOn: $notifications.resetAlertsEnabled)
-                        .toggleStyle(.checkbox)
-                        .controlSize(.small)
-                        .font(.caption)
+                    checkboxToggle("When a limit resets", isOn: $notifications.resetAlertsEnabled)
 
                     if notifications.permissionDenied {
                         Button {
@@ -216,9 +211,9 @@ struct MenuPanelView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// A compact checkbox row for the bar-graph style's sub-options, matching
-    /// the notification-threshold rows' styling.
-    private func barsOptionToggle(_ title: String, isOn: Binding<Bool>) -> some View {
+    /// A compact checkbox row for a setting's sub-options (bar-graph style,
+    /// alert thresholds).
+    private func checkboxToggle(_ title: String, isOn: Binding<Bool>) -> some View {
         Toggle(title, isOn: isOn)
             .toggleStyle(.checkbox)
             .controlSize(.small)
@@ -306,7 +301,7 @@ struct MenuPanelView: View {
                     if store.menuBarDisplayMode == .bars {
                         if store.hasSessionLimit {
                             HStack(spacing: 6) {
-                                barsOptionToggle("Weekly bar", isOn: $store.menuBarShowsWeekBar)
+                                checkboxToggle("Weekly bar", isOn: $store.menuBarShowsWeekBar)
                                 if store.menuBarShowsWeekBar {
                                     weekLimitPicker("Weekly bar source", selection: $store.menuBarWeekBarSource,
                                                     help: "Which weekly limit the second bar tracks")
@@ -314,18 +309,18 @@ struct MenuPanelView: View {
                             }
                         } else {
                             HStack(spacing: 6) {
-                                barsOptionToggle("Second bar", isOn: $store.menuBarShowsSecondWeekBar)
+                                checkboxToggle("Second bar", isOn: $store.menuBarShowsSecondWeekBar)
                                 Text(store.secondWeekLimitName)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        barsOptionToggle("Percentages", isOn: $store.menuBarShowsPercent)
-                        barsOptionToggle("Vertical bars", isOn: $store.menuBarBarsVertical)
+                        checkboxToggle("Percentages", isOn: $store.menuBarShowsPercent)
+                        checkboxToggle("Vertical bars", isOn: $store.menuBarBarsVertical)
                         if !store.menuBarBarsVertical {
                             // Width only applies to horizontal bars — a vertical
                             // bar's length is the menu-bar height.
-                            barsOptionToggle("Half-width bars", isOn: $store.menuBarBarsHalfWidth)
+                            checkboxToggle("Half-width bars", isOn: $store.menuBarBarsHalfWidth)
                         }
                     }
                 }
@@ -369,9 +364,7 @@ struct MenuPanelView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 if let updated = store.lastUpdated {
-                    // lastUpdated reflects the last SUCCESSFUL capture. Calm
-                    // wording with a muted "· stale" only once data is >10 min old.
-                    Text("Updated \(UsageFormatting.clockString(updated))\(store.dataAge.map { $0 > 10 * 60 ? " · stale" : "" } ?? "")")
+                    Text("Updated \(UsageFormatting.clockString(updated))\(store.staleHint())")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 } else {
@@ -508,13 +501,13 @@ struct MetricRow: View {
     }
 
     private func resetDescription(now: Date) -> String {
-        let countdown = UsageFormatting.countdownString(to: metric.resetDate, now: now)
-        let absolute = UsageFormatting.absoluteResetString(date: metric.resetDate, timezone: metric.timezone)
-        switch (countdown, absolute) {
-        case let (c?, a?): return "resets in \(c) · \(a)"
-        case let (c?, nil): return "resets in \(c)"
-        case let (nil, a?): return "resets \(a)"
-        default: return "reset time unknown"
+        guard let resetDate = metric.resetDate,
+              let countdown = UsageFormatting.countdownString(to: resetDate, now: now),
+              let absolute = UsageFormatting.absoluteResetString(date: resetDate, timezone: metric.timezone) else {
+            return "reset time unknown"
         }
+        // A reset time that has passed (until the next poll brings the new
+        // window) counts down to "now": "resets now", not "resets in now".
+        return "resets \(countdown == "now" ? countdown : "in " + countdown) · \(absolute)"
     }
 }

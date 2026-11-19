@@ -30,15 +30,6 @@ struct UsageFormattingResetTests {
         #expect(UsageFormatting.shortClockString(date, timeZone: tz) == "08:05")
     }
 
-    @Test func `Nil time zone falls back to current`() {
-        // A nil timezone must behave exactly like the existing zero-arg helper,
-        // which formats in the current timezone.
-        #expect(
-            UsageFormatting.shortClockString(fixedDate, timeZone: nil)
-                == UsageFormatting.shortClockString(fixedDate)
-        )
-    }
-
     // MARK: - Countdown
 
     /// Seconds until the reset → the panel's "resets in …" countdown. Weekly

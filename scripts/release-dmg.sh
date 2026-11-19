@@ -32,9 +32,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${ROOT_DIR}"
 
-# DerivedData lives here. Overridable via CLAUDEMON_DD because llbuild's
-# build.db (SQLite) throws "disk I/O error" when the path contains spaces
-# (e.g. ".../MacOS Projects/..."); point this at a space-free path to avoid it.
+# DerivedData lives here. Overridable via CLAUDEMON_DD: llbuild's build.db
+# (SQLite) throws "disk I/O error" when the path contains spaces, so point it
+# at a space-free path if the checkout lives under one.
 DD="${CLAUDEMON_DD:-${ROOT_DIR}/build/dd}"
 PRODUCTS="${DD}/Build/Products/${CONFIG}"
 APP_BUNDLE="${PRODUCTS}/${APP_NAME}.app"

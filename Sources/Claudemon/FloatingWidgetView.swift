@@ -113,49 +113,32 @@ struct FloatingWidgetView: View {
 
     // MARK: - Footer
 
-    @ViewBuilder private var footer: some View {
+    /// One calm line: the error or waiting text without data, otherwise when
+    /// the shown data was captured. Orange with a warning icon when the latest
+    /// fetch failed while showing last-good data.
+    private var footer: some View {
         HStack(spacing: 4) {
-            if !hasData {
-                // No data yet OR genuine error with nothing to show.
-                if let error = store.errorMessage {
-                    Text(error)
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                } else {
-                    Text("Waiting for usage data…")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            } else if store.isStaleError {
-                // A real failure while showing last-good data — calm orange hint.
+            if store.isStaleError {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 8))
-                    .foregroundStyle(.orange)
-                Text(footerTimeText(prefix: "last update "))
-                    .font(.system(size: 9))
-                    .foregroundStyle(.orange)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            } else {
-                // Fresh OR stale-render (no new limit lines this cycle): calm.
-                Text(footerTimeText(prefix: "updated "))
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
             }
+            Text(footerText)
+                .font(.system(size: 9))
+                .lineLimit(1)
         }
+        .foregroundStyle(store.isStaleError ? .orange : .secondary)
         // Centered under the centered rings.
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
-    private func footerTimeText(prefix: String) -> String {
-        guard let updated = store.lastUpdated else { return prefix.trimmingCharacters(in: .whitespaces) }
-        let resetSuffix = resetHint.map { " · " + $0 } ?? ""
-        let staleHint = (store.dataAge ?? 0) > 10 * 60 ? " · stale" : ""
-        return prefix + UsageFormatting.shortClockString(updated) + resetSuffix + staleHint
+    private var footerText: String {
+        guard let updated = store.lastUpdated else {
+            return store.errorMessage ?? "Waiting for usage data…"
+        }
+        return (store.isStaleError ? "last update " : "updated ")
+            + UsageFormatting.shortClockString(updated)
+            + (resetHint.map { " · " + $0 } ?? "")
+            + store.staleHint()
     }
 
     /// When the primary limit resets (see `UsageFormatting.resetHint`).

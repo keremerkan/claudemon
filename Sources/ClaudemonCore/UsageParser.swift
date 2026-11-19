@@ -5,7 +5,7 @@ public enum UsageParseError: Error, LocalizedError {
     /// The `.result` body was empty — a genuine failure (no usable output).
     case emptyResult
     /// The `.result` body was a real, non-empty usage report, but it did NOT
-    /// contain the three "Current session/week" limit lines. This is NOT a
+    /// contain any "Current session/week" limit line. This is NOT a
     /// failure: the `claude` CLI only refreshes those lines on its own ~1-minute
     /// internal cadence and returns a fast local-only body in between. The
     /// app should keep showing last-good data ("stale render"), not an error.
@@ -28,7 +28,8 @@ public enum UsageParseError: Error, LocalizedError {
 
 /// Tolerant parser turning the human-readable `.result` text into a `UsageReport`.
 ///
-/// Expected lines (order tolerant, wording tolerant):
+/// Expected lines (order tolerant, wording tolerant; accounts without a session
+/// limit, such as Max plans, get no session line):
 ///   Current session: 28% used · resets Jun 24 at 2:49am (Europe/Istanbul)
 ///   Current week (all models): 29% used · resets Jun 26 at 9:59am (Europe/Istanbul)
 ///   Current week (Fable): 2% used · resets Jun 26 at 10am (Europe/Istanbul)
@@ -39,7 +40,8 @@ public enum UsageParseError: Error, LocalizedError {
 /// per-model kind, whatever name currently appears in the parentheses.
 ///
 /// Times may be "2:49am", "9:59am", or "10am" (no minutes). The year is not in
-/// the text and is inferred as the nearest future occurrence.
+/// the text: it is this year, or next year when this year's date is more than
+/// a day in the past (the year wrapped).
 public enum UsageParser {
 
     /// Parse the outer subprocess JSON, extract `.result`, then parse metrics.
@@ -71,13 +73,12 @@ public enum UsageParser {
 
         guard !metrics.isEmpty else { throw UsageParseError.noMetricsFound }
 
-        // Keep a stable, expected ordering.
-        let order: [UsageMetric.Kind] = [.session, .weekAll, .weekModel]
-        metrics.sort { a, b in
-            (order.firstIndex(of: a.kind) ?? 99) < (order.firstIndex(of: b.kind) ?? 99)
+        // Stable order (session, all-models week, per-model week), whatever
+        // order the lines came in. Each kind appears at most once.
+        let ordered = UsageMetric.Kind.allCases.compactMap { kind in
+            metrics.first { $0.kind == kind }
         }
-
-        return UsageReport(metrics: metrics, capturedAt: now)
+        return UsageReport(metrics: ordered, capturedAt: now)
     }
 
     // MARK: - Line classification
@@ -185,9 +186,8 @@ public enum UsageParser {
         calendar.timeZone = timezone
 
         // Infer year: start with the current year (in the target tz), then roll
-        // forward if the resulting date is in the past.
-        let nowComponents = calendar.dateComponents([.year], from: now)
-        let baseYear = nowComponents.year ?? Calendar.current.component(.year, from: now)
+        // forward if the date is well in the past (see below).
+        let baseYear = calendar.component(.year, from: now)
 
         var components = DateComponents()
         components.timeZone = timezone
@@ -200,8 +200,11 @@ public enum UsageParser {
 
         guard var date = calendar.date(from: components) else { return (nil, nil) }
 
-        // If the computed date is already in the past, roll to next year.
-        if date < now {
+        // Resets are at most a week ahead, so a date more than a day in the
+        // past means the year wrapped ("Jan 5" read in December): roll it to
+        // next year. A date that only just passed is a reset happening now and
+        // stays this year; rolling it would show a ~8760h countdown.
+        if date < now.addingTimeInterval(-24 * 3600) {
             components.year = baseYear + 1
             if let next = calendar.date(from: components) {
                 date = next

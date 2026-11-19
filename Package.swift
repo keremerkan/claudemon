@@ -1,12 +1,12 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
-// This Package.swift exists primarily so QA can build the shared core and run
-// the parser test suite from the command line (`swift build`, `swift test`).
+// Builds the shared core and the app, and runs the test suite, from the
+// command line (`swift build`, `swift test`).
 //
 // The shippable product — including the WidgetKit extension and App Group —
-// is built from the Xcode project (`Claudemon.xcodeproj`, maintained by hand).
-// See scripts/build-xcode.sh.
+// is built from the Xcode project (`Claudemon.xcodeproj`, maintained by hand);
+// scripts/release-dmg.sh builds the release.
 let package = Package(
     name: "Claudemon",
     platforms: [

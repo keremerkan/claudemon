@@ -126,25 +126,27 @@ missing prerequisite.
   GUI apps on macOS do not inherit your shell `PATH`, so it resolves `claude` by
   absolute path, checking (in priority order):
   - `/opt/homebrew/bin/claude` (Homebrew) and `/usr/local/bin/claude`
-  - `~/.claude/local/claude` (the official local installer)
-  - `~/.local/bin/claude`
+  - `~/.claude/local/claude` (the older local installer)
+  - `~/.local/bin/claude` (the native installer)
   - `~/.npm-global/bin/claude` (npm global)
   - `~/Library/pnpm/claude` (pnpm)
   - `~/.volta/bin/claude` (Volta)
   - `~/.asdf/shims/claude` (asdf)
   - per-version directories under `~/.nvm/versions/node` and `~/.fnm`
     (nvm / fnm)
-  - finally, a login-shell `command -v claude` fallback (zsh, then bash) so any
-    other PATH set in your shell rc files is honored.
+  - finally, `command -v claude` in an interactive login shell (zsh, then
+    bash), so a PATH set in `.zshrc` / `.bashrc` is honored too. A shell that
+    hangs during startup is given up after 10 seconds.
 
 If `claude` is not installed, Claudemon shows a calm in-app prompt with the
 install command and a link rather than failing silently:
 
 ```
-npm install -g @anthropic-ai/claude-code
+curl -fsSL https://claude.ai/install.sh | bash
 ```
 
-(The panel also links to <https://claude.ai/download>.) If `claude` is installed
+(The panel also links to the [setup guide](https://code.claude.com/docs/en/setup)
+for other ways to install.) If `claude` is installed
 but not signed in, the panel tells you to run `claude` in a terminal and use
 `/login`.
 
@@ -279,7 +281,7 @@ entitlements.
 
 ```bash
 swift build   # debug build of ClaudemonCore + the app
-swift test    # runs the Swift Testing suite (currently 80 tests, 113 cases)
+swift test    # runs the Swift Testing suite
 ```
 
 ## Release / signing (building the signed DMG)

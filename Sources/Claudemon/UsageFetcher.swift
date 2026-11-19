@@ -31,17 +31,18 @@ enum UsageFetchError: Error, LocalizedError {
             return "Couldn't read usage"
         }
     }
-
-    /// Heuristic: does a non-zero exit's stderr look like an auth / login issue?
-    /// Delegates to the pure, unit-tested classifier in ClaudemonCore.
-    static func looksLikeAuthFailure(stderr: String) -> Bool {
-        ClaudeDiagnostics.looksLikeAuthFailure(stderr: stderr)
-    }
 }
 
 /// Runs `claude -p "/usage" --output-format json` off the main thread and
 /// returns the raw stdout JSON data.
 struct UsageFetcher {
+
+    /// What a finished child process left behind.
+    struct ProcessOutput: Sendable {
+        let status: Int32
+        let stdout: Data
+        let stderr: Data
+    }
 
     /// A stable, app-owned, NON-protected working directory for child
     /// processes. We pin both spawns here so the `claude` CLI never anchors
@@ -60,17 +61,12 @@ struct UsageFetcher {
         return URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
     }
 
-    /// Apply neutral directory anchors to an environment WITHOUT breaking
-    /// credentials: KEEP HOME (claude needs it to find ~/.claude config), keep
-    /// the PATH prepend, but point PWD/OLDPWD at the neutral dir so claude does
-    /// not scan the previous working directory.
-    private static func neutralizedEnvironment(workingDir: URL) -> [String: String] {
-        makeEnvironment(base: ProcessInfo.processInfo.environment, workingDir: workingDir)
-    }
-
     /// Pure, injectable environment builder so the spawn env is unit-testable.
-    /// Given a base environment, apply the neutral directory anchors and PATH
-    /// prepend, and GUARANTEE USER/LOGNAME are present.
+    /// Given a base environment, apply the neutral directory anchors WITHOUT
+    /// breaking credentials: KEEP HOME (claude needs it to find ~/.claude
+    /// config), prepend a sane PATH, point PWD/OLDPWD at the neutral dir so
+    /// claude does not scan the previous working directory, and GUARANTEE
+    /// USER/LOGNAME are present.
     ///
     /// Why USER/LOGNAME matter: the `claude` CLI silently returns a generic
     /// empty body (exit 0, no metrics) when USER is absent from its environment.
@@ -96,9 +92,8 @@ struct UsageFetcher {
 
     /// Resolve the absolute path of the `claude` executable, or nil.
     /// Order: session cache → filesystem candidates/globs (ClaudeLocator) →
-    /// login-shell fallback (zsh, then bash). The result is cached for the
-    /// session.
-    static func resolveClaudePath() -> String? {
+    /// shell fallback (zsh, then bash). The result is cached for the session.
+    static func resolveClaudePath() async -> String? {
         if let cached = cachedClaudePath.withLock({ $0 }) {
             return cached
         }
@@ -111,16 +106,15 @@ struct UsageFetcher {
             return cache(found)
         }
 
-        // 3. Login-shell fallback so version-manager PATHs (set in rc files) load.
-        //    Pinned to the neutral working dir + neutralized env so we do NOT
-        //    reintroduce the TCC prompts. Try zsh, then bash.
+        // 3. Shell fallback so PATHs set in the user's startup files load.
+        //    Try zsh, then bash.
         for shell in ["/bin/zsh", "/bin/bash"] where fm.isExecutableFile(atPath: shell) {
-            if let resolved = whichClaude(shell: shell, login: true) {
+            if let resolved = await whichClaude(shell: shell) {
                 return cache(resolved)
             }
         }
 
-        fetchLog.error("claude binary not found in candidate paths, globs, or login-shell lookup")
+        fetchLog.error("claude binary not found in candidate paths, globs, or shell lookup")
         return nil
     }
 
@@ -136,33 +130,28 @@ struct UsageFetcher {
         cachedClaudePath.withLock { $0 = nil }
     }
 
-    /// Resolve `claude` via a shell's `command -v`. When `login` is true a login
-    /// shell (`-lc`) sources the user's rc files so nvm/fnm/volta PATHs load.
-    /// Always pinned to the neutral working dir with PWD/OLDPWD neutralized and
-    /// HOME preserved, so the lookup never triggers TCC prompts.
-    private static func whichClaude(shell: String, login: Bool) -> String? {
-        let workingDir = neutralWorkingDirectoryURL
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: shell)
-        process.arguments = [login ? "-lc" : "-c", "command -v claude"]
-        process.currentDirectoryURL = workingDir
-        process.environment = neutralizedEnvironment(workingDir: workingDir)
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
+    /// How long a shell may take to start up and answer `command -v`.
+    private static let shellLookupTimeout: TimeInterval = 10
+
+    /// Ask the user's shell where `claude` is. An interactive login shell
+    /// (`-lic`) reads the profile files AND the rc file (.zshrc / .bashrc),
+    /// where version managers usually set PATH; a plain login shell skips the
+    /// rc file. The timeout keeps a startup file that hangs from stalling
+    /// usage checks.
+    private static func whichClaude(shell: String) async -> String? {
+        let output: ProcessOutput
         do {
-            try process.run()
-            process.waitUntilExit()
+            output = try await run(shell, arguments: ["-lic", "command -v claude"],
+                                   timeout: shellLookupTimeout)
         } catch {
+            fetchLog.error("\(shell, privacy: .public) lookup of claude failed: \(error.localizedDescription, privacy: .public)")
             return nil
         }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        // `command -v` may emit multiple lines; take the first executable hit.
-        let output = String(decoding: data, as: UTF8.self)
-        for line in output.split(separator: "\n") {
+        // Startup files can print lines of their own; take the first
+        // executable path.
+        for line in String(decoding: output.stdout, as: UTF8.self).split(separator: "\n") {
             let path = line.trimmingCharacters(in: .whitespaces)
-            if !path.isEmpty, path.hasPrefix("/"),
-               FileManager.default.isExecutableFile(atPath: path) {
+            if path.hasPrefix("/"), FileManager.default.isExecutableFile(atPath: path) {
                 return path
             }
         }
@@ -172,38 +161,72 @@ struct UsageFetcher {
     /// Fetch raw stdout from the CLI. Async, runs the process on a background
     /// thread. Enforces a timeout (default 15s).
     static func fetchUsageJSON(timeout: TimeInterval = 15) async throws -> Data {
-        guard let claudePath = resolveClaudePath() else {
+        guard let claudePath = await resolveClaudePath() else {
             throw UsageFetchError.claudeNotFound
         }
 
-        return try await withCheckedThrowingContinuation { continuation in
+        let output: ProcessOutput
+        do {
+            output = try await run(claudePath, arguments: ["-p", "/usage", "--output-format", "json"],
+                                   timeout: timeout)
+        } catch {
+            fetchLog.error("claude did not finish: \(error.localizedDescription, privacy: .public)")
+            if case UsageFetchError.launchFailed = error {
+                // The cached path may be stale (e.g. an nvm/fnm version switch
+                // moved the binary). Clear it so the NEXT poll re-discovers
+                // and self-heals without an app restart.
+                invalidateCache()
+            }
+            throw error
+        }
+
+        guard output.status == 0 else {
+            let stderr = String(decoding: output.stderr, as: UTF8.self)
+            fetchLog.error("claude exited non-zero (\(output.status, privacy: .public))")
+            throw ClaudeDiagnostics.looksLikeAuthFailure(stderr: stderr)
+                ? UsageFetchError.notSignedIn
+                : UsageFetchError.nonZeroExit(code: output.status, stderr: stderr)
+        }
+        guard !output.stdout.isEmpty else {
+            fetchLog.error("claude produced empty stdout")
+            throw UsageFetchError.emptyOutput
+        }
+        fetchLog.debug("claude usage fetch succeeded (\(output.stdout.count, privacy: .public) bytes)")
+        return output.stdout
+    }
+
+    /// Run a child process and collect its output, throwing `.timedOut` if it
+    /// has not finished within `timeout` and `.launchFailed` if it can't start.
+    ///
+    /// The child is pinned to the neutral working directory and environment
+    /// (see `makeEnvironment`), so it does not scan the user's home/project
+    /// dirs, which would surface TCC prompts attributed to the unsandboxed
+    /// parent. Its stdin is the null device: nothing can be typed into it, so
+    /// a read gets end-of-file instead of waiting.
+    static func run(_ executablePath: String, arguments: [String],
+                    timeout: TimeInterval) async throws -> ProcessOutput {
+        try await withCheckedThrowingContinuation { continuation in
             // Resume guard so we never double-resume.
             let resumed = ResumeGuard()
 
             let workingDir = neutralWorkingDirectoryURL
 
             let process = Process()
-            process.executableURL = URL(fileURLWithPath: claudePath)
-            process.arguments = ["-p", "/usage", "--output-format", "json"]
-
-            // Pin the child to a neutral, non-protected working directory so it
-            // does not scan the user's home/project dirs (which would surface
-            // TCC prompts attributed to the unsandboxed parent).
+            process.executableURL = URL(fileURLWithPath: executablePath)
+            process.arguments = arguments
             process.currentDirectoryURL = workingDir
+            process.environment = makeEnvironment(base: ProcessInfo.processInfo.environment,
+                                                  workingDir: workingDir)
 
             let stdoutPipe = Pipe()
             let stderrPipe = Pipe()
+            process.standardInput = FileHandle.nullDevice
             process.standardOutput = stdoutPipe
             process.standardError = stderrPipe
 
-            // Keep HOME (claude needs it for ~/.claude credentials) and a sane
-            // PATH, but neutralize PWD/OLDPWD so scans aren't anchored at the
-            // previous cwd.
-            process.environment = neutralizedEnvironment(workingDir: workingDir)
-
             // Drain stdout/stderr incrementally so the kernel pipe buffer
             // (~64KB) never fills and blocks the child before it exits. Without
-            // this, a large /usage payload would deadlock and trip the timeout.
+            // this, a large payload would deadlock and trip the timeout.
             let outBuffer = DataBuffer()
             let errBuffer = DataBuffer()
             let outHandle = stdoutPipe.fileHandleForReading
@@ -212,7 +235,7 @@ struct UsageFetcher {
             // Finish only once the process has exited AND both pipes hit EOF.
             // No blocking read after exit: if a grandchild keeps a pipe open,
             // the result waits and the timeout below can still fire, instead
-            // of the fetch (and all later polls) hanging forever.
+            // of the caller (and all later polls) hanging forever.
             let finished = DispatchGroup()
             finished.enter() // process exit
             drain(outHandle, into: outBuffer, group: finished)
@@ -220,15 +243,18 @@ struct UsageFetcher {
 
             // Timeout watchdog.
             let timeoutWork = DispatchWorkItem {
+                guard resumed.tryResume() else { return }
+                outHandle.readabilityHandler = nil
+                errHandle.readabilityHandler = nil
                 if process.isRunning {
                     process.terminate()
+                    // An interactive shell ignores SIGTERM; don't leave one
+                    // behind on every poll.
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 2) {
+                        if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+                    }
                 }
-                if resumed.tryResume() {
-                    outHandle.readabilityHandler = nil
-                    errHandle.readabilityHandler = nil
-                    fetchLog.error("claude CLI timed out after \(timeout, privacy: .public)s")
-                    continuation.resume(throwing: UsageFetchError.timedOut)
-                }
+                continuation.resume(throwing: UsageFetchError.timedOut)
             }
             DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: timeoutWork)
 
@@ -237,46 +263,18 @@ struct UsageFetcher {
             finished.notify(queue: .global()) {
                 timeoutWork.cancel()
                 guard resumed.tryResume() else { return }
-
-                let outData = outBuffer.data
-                let errData = errBuffer.data
-                let status = process.terminationStatus
-
-                if status != 0 {
-                    let stderr = String(decoding: errData, as: UTF8.self)
-                    fetchLog.error("claude exited non-zero (\(status, privacy: .public))")
-                    if UsageFetchError.looksLikeAuthFailure(stderr: stderr) {
-                        continuation.resume(throwing: UsageFetchError.notSignedIn)
-                    } else {
-                        continuation.resume(throwing: UsageFetchError.nonZeroExit(
-                            code: status, stderr: stderr))
-                    }
-                    return
-                }
-
-                guard !outData.isEmpty else {
-                    fetchLog.error("claude produced empty stdout")
-                    continuation.resume(throwing: UsageFetchError.emptyOutput)
-                    return
-                }
-                fetchLog.debug("claude usage fetch succeeded (\(outData.count, privacy: .public) bytes)")
-                continuation.resume(returning: outData)
+                continuation.resume(returning: ProcessOutput(
+                    status: process.terminationStatus, stdout: outBuffer.data, stderr: errBuffer.data))
             }
 
             do {
                 try process.run()
             } catch {
                 timeoutWork.cancel()
-                if resumed.tryResume() {
-                    outHandle.readabilityHandler = nil
-                    errHandle.readabilityHandler = nil
-                    fetchLog.error("failed to launch claude: \(error.localizedDescription, privacy: .public)")
-                    // The cached path may be stale (e.g. an nvm/fnm version
-                    // switch moved the binary). Clear it so the NEXT poll
-                    // re-discovers and self-heals without an app restart.
-                    invalidateCache()
-                    continuation.resume(throwing: UsageFetchError.launchFailed(error.localizedDescription))
-                }
+                guard resumed.tryResume() else { return }
+                outHandle.readabilityHandler = nil
+                errHandle.readabilityHandler = nil
+                continuation.resume(throwing: UsageFetchError.launchFailed(error.localizedDescription))
             }
         }
     }

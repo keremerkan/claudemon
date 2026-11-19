@@ -12,10 +12,9 @@ struct ClaudemonWidgetView: View {
         if let report = entry.report {
             switch family {
             case .systemSmall:
-                SmallUsageView(report: report, capturedAt: entry.capturedAt, isStale: entry.isStale)
+                SmallUsageView(report: report, isStale: entry.isStale)
             default:
-                MediumUsageView(report: report, capturedAt: entry.capturedAt,
-                                isStale: entry.isStale, preciseBars: entry.preciseBars)
+                MediumUsageView(report: report, isStale: entry.isStale, preciseBars: entry.preciseBars)
             }
         } else {
             EmptyUsageView()
@@ -30,7 +29,6 @@ struct ClaudemonWidgetView: View {
 /// lists every limit.
 struct SmallUsageView: View {
     let report: UsageReport
-    let capturedAt: Date?
     let isStale: Bool
 
     private var primary: UsageMetric? { report.primary }
@@ -41,7 +39,7 @@ struct SmallUsageView: View {
         RingsOverFooter {
             ring
         } footer: {
-            UpdatedText(capturedAt: capturedAt, isStale: isStale, font: .callout)
+            UpdatedText(capturedAt: report.capturedAt, isStale: isStale, font: .callout)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(primary.map {
@@ -62,7 +60,6 @@ struct SmallUsageView: View {
 /// the same layout and wording as the app's floating window.
 struct RingsUsageView: View {
     let report: UsageReport
-    let capturedAt: Date?
     let isStale: Bool
 
     @Environment(\.showsRemainingUsage) private var showsRemaining
@@ -71,7 +68,7 @@ struct RingsUsageView: View {
         RingsOverFooter {
             UsageRingRow(report: report, spacing: 16)
         } footer: {
-            UpdatedText(capturedAt: capturedAt, isStale: isStale,
+            UpdatedText(capturedAt: report.capturedAt, isStale: isStale,
                         suffix: report.primary.flatMap(UsageFormatting.resetHint(for:)),
                         font: .callout)
         }
@@ -119,28 +116,25 @@ private struct RingsOverFooter<Rings: View, Footer: View>: View {
 /// "updated 14:32" (plus an optional " · suffix"), or "last update 14:32" in
 /// orange when the app's latest fetch failed: the floating window's wording.
 private struct UpdatedText: View {
-    let capturedAt: Date?
+    let capturedAt: Date
     let isStale: Bool
     var suffix: String?
     let font: Font
 
     var body: some View {
-        if let capturedAt {
-            let clock = UsageFormatting.shortClockString(capturedAt)
-            Text((isStale ? "last update " : "updated ") + clock + (suffix.map { " · " + $0 } ?? ""))
-                .font(font)
-                .minimumScaleFactor(0.7)
-                .lineLimit(1)
-                .foregroundStyle(isStale ? .orange : .secondary)
-        }
+        let clock = UsageFormatting.shortClockString(capturedAt)
+        Text((isStale ? "last update " : "updated ") + clock + (suffix.map { " · " + $0 } ?? ""))
+            .font(font)
+            .minimumScaleFactor(0.7)
+            .lineLimit(1)
+            .foregroundStyle(isStale ? .orange : .secondary)
     }
 }
 
-// MARK: - Medium: all three metrics as labeled bars
+// MARK: - Medium: every limit as a labeled bar
 
 struct MediumUsageView: View {
     let report: UsageReport
-    let capturedAt: Date?
     let isStale: Bool
     let preciseBars: Bool
 
@@ -156,7 +150,7 @@ struct MediumUsageView: View {
                 Text("Claude Usage")
                     .font(.subheadline.weight(.semibold))
                 Spacer()
-                UpdatedText(capturedAt: capturedAt, isStale: isStale, font: .caption2)
+                UpdatedText(capturedAt: report.capturedAt, isStale: isStale, font: .caption2)
             }
 
             ForEach(report.metrics) { metric in

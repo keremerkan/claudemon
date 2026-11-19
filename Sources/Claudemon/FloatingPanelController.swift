@@ -19,8 +19,6 @@ final class FloatingPanelController {
         }
     }
 
-    var isVisible: Bool { panel?.isVisible ?? false }
-
     func setVisible(_ visible: Bool) {
         if visible {
             show()
@@ -100,27 +98,25 @@ final class FloatingPanelController {
     /// and clamping to the current screen so it never jumps off-screen.
     private func setCompact(_ compact: Bool) {
         guard let panel else { return }
-        let target = Self.contentSize(compact: compact)
-        let old = panel.frame
-        // macOS origin is bottom-left; hold the top edge (maxY) and left edge.
-        var frame = NSRect(
-            x: old.minX,
-            y: old.maxY - target.height,
-            width: target.width,
-            height: target.height
-        )
-        frame = Self.clamp(frame, to: panel.screen ?? NSScreen.main)
+        let frame = Self.clamp(Self.frame(of: panel, compact: compact),
+                               to: panel.screen ?? NSScreen.main)
         panel.setFrame(frame, display: true, animate: true)
     }
 
     /// Force a restored panel's size to match the persisted form without moving
     /// its top-left corner.
     private func reconcileSize(_ panel: NSPanel, compact: Bool) {
-        let target = Self.contentSize(compact: compact)
-        let f = panel.frame
-        guard f.size != target else { return }
-        let frame = NSRect(x: f.minX, y: f.maxY - target.height, width: target.width, height: target.height)
+        let frame = Self.frame(of: panel, compact: compact)
+        guard frame.size != panel.frame.size else { return }
         panel.setFrame(frame, display: false)
+    }
+
+    /// The panel's frame resized to the given form with its top-left corner
+    /// held in place (macOS origin is bottom-left, so the top edge is maxY).
+    private static func frame(of panel: NSPanel, compact: Bool) -> NSRect {
+        let size = contentSize(compact: compact)
+        return NSRect(x: panel.frame.minX, y: panel.frame.maxY - size.height,
+                      width: size.width, height: size.height)
     }
 
     private static func contentSize(compact: Bool) -> NSSize {
