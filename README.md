@@ -19,9 +19,10 @@ progress bar, the percent used, a `resets in Xh Ym` countdown, and the
 absolute reset time in the limit's own timezone.
 
 Max plans no longer have a session limit, and Claude Code doesn't report one
-for them. When there's no session limit, Claudemon hides it and the **Current
-Week (all models)** limit takes its place in the menu bar, the floating
-window's ring and the small widget's ring.
+for them. When there's no session limit, Claudemon hides it and a weekly limit
+becomes the main one: in the menu bar the one you pick as **Main limit**
+(all models by default), and in the floating window and the small widget the
+**Current Week (all models)** limit.
 
 > **Unofficial tool.** Claudemon is a third-party app and is **not affiliated
 > with, endorsed by, or sponsored by Anthropic**. See the
@@ -57,6 +58,8 @@ Choosing **Bar graph** reveals four extra options under the style picker:
   mode, next to) the session bar. A picker beside the checkbox chooses which
   weekly limit it tracks: **All models** (the default) or the per-model limit,
   listed under its current model name (e.g. **Fable**).
+  Without a session limit (Max plans) this becomes **Second bar** (on by
+  default), which shows whichever weekly limit isn't the main one.
 - **Percentages** — shows the percent value(s) beside the bars; with two bars
   they stack vertically in a smaller font, in the same order as the bars
   (session first).
@@ -65,6 +68,10 @@ Choosing **Bar graph** reveals four extra options under the style picker:
 - **Half-width bars** — horizontal bars at half the standard width, for the
   tightest bar-graph footprint. (Horizontal only — a vertical bar's length is
   the menu-bar height, so the toggle hides in vertical mode.)
+
+Without a session limit, a **Main limit** picker also appears under the style
+picker in every style: it chooses which weekly limit the menu bar shows first
+(its percent, gauge and first bar).
 
 Your choices are remembered across launches.
 

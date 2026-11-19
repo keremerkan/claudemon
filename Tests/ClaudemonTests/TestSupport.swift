@@ -18,6 +18,22 @@ final class TemporaryDirectory: Sendable {
     }
 }
 
+/// A uniquely named, initially empty `UserDefaults` suite that is deleted
+/// when this object goes away, so settings a test writes never leak into
+/// other tests or later runs.
+final class TestDefaults {
+    let defaults: UserDefaults
+    private let suiteName = "claudemon-tests-\(UUID().uuidString)"
+
+    init() {
+        defaults = UserDefaults(suiteName: suiteName)!
+    }
+
+    deinit {
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+}
+
 /// A fixed wall-clock instant in the given IANA timezone, for deterministic
 /// date fixtures.
 func makeDate(

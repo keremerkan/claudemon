@@ -37,7 +37,7 @@ final class UsageStore {
     /// Whether the floating widget is shown. Persisted in UserDefaults.
     var floatingEnabled: Bool {
         didSet {
-            UserDefaults.standard.set(floatingEnabled, forKey: Self.floatingDefaultsKey)
+            defaults.set(floatingEnabled, forKey: Self.floatingDefaultsKey)
             floatingChange?(floatingEnabled)
         }
     }
@@ -50,7 +50,7 @@ final class UsageStore {
     /// panel.
     var floatingCompact: Bool {
         didSet {
-            UserDefaults.standard.set(floatingCompact, forKey: Self.floatingCompactKey)
+            defaults.set(floatingCompact, forKey: Self.floatingCompactKey)
             floatingCompactChange?(floatingCompact)
         }
     }
@@ -63,7 +63,7 @@ final class UsageStore {
     /// case's rawValue. Defaults to `.iconAndText`.
     var menuBarDisplayMode: MenuBarDisplayMode {
         didSet {
-            UserDefaults.standard.set(menuBarDisplayMode.rawValue, forKey: Self.menuBarDisplayModeKey)
+            defaults.set(menuBarDisplayMode.rawValue, forKey: Self.menuBarDisplayModeKey)
         }
     }
 
@@ -74,35 +74,55 @@ final class UsageStore {
     /// session bar.
     var menuBarShowsWeekBar: Bool {
         didSet {
-            UserDefaults.standard.set(menuBarShowsWeekBar, forKey: Self.menuBarShowsWeekBarKey)
+            defaults.set(menuBarShowsWeekBar, forKey: Self.menuBarShowsWeekBarKey)
         }
     }
 
     /// Which weekly limit the second bar tracks (all models vs. per model).
     var menuBarWeekBarSource: MenuBarWeekBarSource {
         didSet {
-            UserDefaults.standard.set(menuBarWeekBarSource.rawValue, forKey: Self.menuBarWeekBarSourceKey)
+            defaults.set(menuBarWeekBarSource.rawValue, forKey: Self.menuBarWeekBarSourceKey)
+        }
+    }
+
+    // Menu-bar choices for accounts WITHOUT a session limit (Max plans), kept
+    // apart from the session-account options above so neither overwrites the
+    // other's.
+
+    /// The weekly limit the menu bar shows first (text and bars) when there is
+    /// no session limit.
+    var menuBarMainWeekLimit: MenuBarWeekBarSource {
+        didSet {
+            defaults.set(menuBarMainWeekLimit.rawValue, forKey: Self.menuBarMainWeekLimitKey)
+        }
+    }
+
+    /// Show the other weekly limit as a second bar when there is no session
+    /// limit.
+    var menuBarShowsSecondWeekBar: Bool {
+        didSet {
+            defaults.set(menuBarShowsSecondWeekBar, forKey: Self.menuBarShowsSecondWeekBarKey)
         }
     }
 
     /// Show the percent value(s) beside the bar(s).
     var menuBarShowsPercent: Bool {
         didSet {
-            UserDefaults.standard.set(menuBarShowsPercent, forKey: Self.menuBarShowsPercentKey)
+            defaults.set(menuBarShowsPercent, forKey: Self.menuBarShowsPercentKey)
         }
     }
 
     /// Use vertical (bottom-up) bars instead of horizontal ones.
     var menuBarBarsVertical: Bool {
         didSet {
-            UserDefaults.standard.set(menuBarBarsVertical, forKey: Self.menuBarBarsVerticalKey)
+            defaults.set(menuBarBarsVertical, forKey: Self.menuBarBarsVerticalKey)
         }
     }
 
     /// Horizontal bars at half the standard width (ignored in vertical mode).
     var menuBarBarsHalfWidth: Bool {
         didSet {
-            UserDefaults.standard.set(menuBarBarsHalfWidth, forKey: Self.menuBarBarsHalfWidthKey)
+            defaults.set(menuBarBarsHalfWidth, forKey: Self.menuBarBarsHalfWidthKey)
         }
     }
 
@@ -123,6 +143,8 @@ final class UsageStore {
     static let menuBarDisplayModeKey = "menuBarDisplayMode"
     static let menuBarShowsWeekBarKey = "menuBarShowsWeekBar"
     static let menuBarWeekBarSourceKey = "menuBarWeekBarSource"
+    static let menuBarMainWeekLimitKey = "menuBarMainWeekLimit"
+    static let menuBarShowsSecondWeekBarKey = "menuBarShowsSecondWeekBar"
     static let menuBarShowsPercentKey = "menuBarShowsPercent"
     static let menuBarBarsVerticalKey = "menuBarBarsVertical"
     static let menuBarBarsHalfWidthKey = "menuBarBarsHalfWidth"
@@ -161,23 +183,29 @@ final class UsageStore {
     // so we only reload when the data meaningfully changed OR at most every 15
     // minutes. The menu bar / floating panel stay genuinely live regardless.
     private let cache: SharedUsageCache
+    private let defaults: UserDefaults
     private let minReloadInterval: TimeInterval = 15 * 60
     @ObservationIgnored private var lastReloadAt: Date?
     @ObservationIgnored private var lastReloadedSnapshot: [UsageMetric.Kind: Int] = [:]
 
-    /// `cache` is injectable so tests can verify launch priming against a
-    /// temp-directory cache without the App Group entitlement. Production uses
-    /// the shared App Group cache.
-    init(cache: SharedUsageCache = .shared) {
+    /// `cache` and `defaults` are injectable so tests can verify launch
+    /// priming against a temp-directory cache (without the App Group
+    /// entitlement) and settings against a throwaway defaults suite.
+    /// Production uses the shared App Group cache and standard defaults.
+    init(cache: SharedUsageCache = .shared, defaults: UserDefaults = .standard) {
         self.cache = cache
-        self.floatingEnabled = UserDefaults.standard.bool(forKey: Self.floatingDefaultsKey)
-        self.floatingCompact = UserDefaults.standard.bool(forKey: Self.floatingCompactKey)
-        let storedMode = UserDefaults.standard.string(forKey: Self.menuBarDisplayModeKey)
+        self.defaults = defaults
+        self.floatingEnabled = defaults.bool(forKey: Self.floatingDefaultsKey)
+        self.floatingCompact = defaults.bool(forKey: Self.floatingCompactKey)
+        let storedMode = defaults.string(forKey: Self.menuBarDisplayModeKey)
         self.menuBarDisplayMode = storedMode.flatMap(MenuBarDisplayMode.init(rawValue:)) ?? .iconAndText
-        let defaults = UserDefaults.standard
         self.menuBarShowsWeekBar = defaults.bool(forKey: Self.menuBarShowsWeekBarKey)
         let storedSource = defaults.string(forKey: Self.menuBarWeekBarSourceKey)
         self.menuBarWeekBarSource = storedSource.flatMap(MenuBarWeekBarSource.init(rawValue:)) ?? .allModels
+        let storedMainLimit = defaults.string(forKey: Self.menuBarMainWeekLimitKey)
+        self.menuBarMainWeekLimit = storedMainLimit.flatMap(MenuBarWeekBarSource.init(rawValue:)) ?? .allModels
+        // The second weekly bar defaults ON (absent key reads nil, not false).
+        self.menuBarShowsSecondWeekBar = (defaults.object(forKey: Self.menuBarShowsSecondWeekBarKey) as? Bool) ?? true
         // Percentages default ON (absent key reads nil, not false).
         self.menuBarShowsPercent = (defaults.object(forKey: Self.menuBarShowsPercentKey) as? Bool) ?? true
         self.menuBarBarsVertical = defaults.bool(forKey: Self.menuBarBarsVerticalKey)
@@ -471,7 +499,7 @@ final class UsageStore {
         return text
     }
 
-    /// The headline limit for the menu-bar label (see `UsageReport.primary`).
+    /// The headline limit for the floating window (see `UsageReport.primary`).
     var primaryMetric: UsageMetric? {
         lastGoodReport?.primary
     }
@@ -482,12 +510,32 @@ final class UsageStore {
         lastGoodReport.map { $0.session != nil } ?? true
     }
 
-    /// The weekly metric the menu-bar bar graph's second bar tracks: the
-    /// user's `menuBarWeekBarSource` choice, or the per-model week when the
-    /// all-models week is already the primary bar (no session limit).
-    var menuBarWeekMetric: UsageMetric? {
+    /// The limit the menu bar shows first (its percent, or the first bar): the
+    /// session, or without one the user's `menuBarMainWeekLimit`, falling back
+    /// to the report's primary if that limit is missing from the report.
+    var menuBarPrimaryMetric: UsageMetric? {
         guard let report = lastGoodReport else { return nil }
-        return report.metric(hasSessionLimit ? menuBarWeekBarSource.metricKind : .weekModel)
+        if let session = report.session { return session }
+        return report.metric(menuBarMainWeekLimit.metricKind) ?? report.primary
+    }
+
+    /// The bar graph's second bar, or nil when the user hides it. With a
+    /// session limit: the chosen weekly limit (`menuBarShowsWeekBar` /
+    /// `menuBarWeekBarSource`). Without one: the weekly limit that isn't the
+    /// main one (`menuBarShowsSecondWeekBar`).
+    var menuBarSecondMetric: UsageMetric? {
+        guard let report = lastGoodReport, let primary = menuBarPrimaryMetric else { return nil }
+        if primary.kind == .session {
+            return menuBarShowsWeekBar ? report.metric(menuBarWeekBarSource.metricKind) : nil
+        }
+        guard menuBarShowsSecondWeekBar else { return nil }
+        return report.metrics.first { $0.kind != .session && $0.kind != primary.kind }
+    }
+
+    /// Settings label for the second weekly bar without a session limit: the
+    /// weekly limit that isn't the main one.
+    var secondWeekLimitName: String {
+        menuBarMainWeekLimit == .allModels ? weekModelName : "All models"
     }
 
     /// Settings label for the per-model weekly source: the model name Anthropic

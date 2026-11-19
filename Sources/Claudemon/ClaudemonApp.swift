@@ -36,7 +36,7 @@ final class ClaudemonAppState {
 }
 
 /// Compact menu-bar label: gauge SF Symbol + the primary limit's percent (the
-/// session, or the all-models week without a session limit), or a rasterized
+/// session, or without one the user's chosen weekly limit), or a rasterized
 /// bar graph in the `.bars` display mode.
 struct MenuBarLabel: View {
     let store: UsageStore
@@ -59,7 +59,7 @@ struct MenuBarLabel: View {
     /// mode entirely so the item is never empty and stays clickable.
     @ViewBuilder
     private var content: some View {
-        if let percent = store.primaryMetric?.percent {
+        if let percent = store.menuBarPrimaryMetric?.percent {
             modeContent(percent: percent)
         } else if store.isNotInstalled || store.isNotSignedIn {
             // Calm onboarding hint, not a scary error — a neutral dash.
@@ -101,7 +101,7 @@ struct MenuBarLabel: View {
     private func barsImage(primaryPercent: Int) -> NSImage? {
         let config = MenuBarBarsView.Configuration(
             primaryPercent: primaryPercent,
-            weekPercent: store.menuBarShowsWeekBar ? store.menuBarWeekMetric?.percent : nil,
+            weekPercent: store.menuBarSecondMetric?.percent,
             showsPercent: store.menuBarShowsPercent,
             isVertical: store.menuBarBarsVertical,
             preciseFill: store.preciseBars,
@@ -128,7 +128,7 @@ struct MenuBarLabel: View {
     /// When Claude Code isn't installed / signed in, show a neutral empty gauge
     /// (no alarm).
     private var gaugeSymbol: String {
-        guard let p = store.primaryMetric?.percent else { return "gauge.with.dots.needle.0percent" }
+        guard let p = store.menuBarPrimaryMetric?.percent else { return "gauge.with.dots.needle.0percent" }
         switch p {
         case ..<34: return "gauge.with.dots.needle.0percent"
         case 34..<67: return "gauge.with.dots.needle.50percent"
@@ -137,11 +137,10 @@ struct MenuBarLabel: View {
     }
 
     private var accessibilityLabel: String {
-        if let primary = store.primaryMetric {
+        if let primary = store.menuBarPrimaryMetric {
             let summary = "Claudemon, \(spokenName(primary)) \(primary.percent) percent"
-            if store.menuBarDisplayMode == .bars, store.menuBarShowsWeekBar,
-               let week = store.menuBarWeekMetric {
-                return "\(summary), \(spokenName(week)) \(week.percent) percent used"
+            if store.menuBarDisplayMode == .bars, let second = store.menuBarSecondMetric {
+                return "\(summary), \(spokenName(second)) \(second.percent) percent used"
             }
             return "\(summary) used"
         }

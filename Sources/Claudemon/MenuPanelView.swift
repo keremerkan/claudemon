@@ -233,6 +233,21 @@ struct MenuPanelView: View {
             .font(.caption)
     }
 
+    /// A compact All models / <model name> menu for choosing a weekly limit.
+    private func weekLimitPicker(_ title: String, selection: Binding<MenuBarWeekBarSource>,
+                                 help: String) -> some View {
+        Picker(title, selection: selection) {
+            Text("All models").tag(MenuBarWeekBarSource.allModels)
+            Text(store.weekModelName).tag(MenuBarWeekBarSource.perModel)
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .controlSize(.mini)
+        .fixedSize()
+        .accessibilityLabel(title)
+        .help(help)
+    }
+
     private func openNotificationSettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension") {
             NSWorkspace.shared.open(url)
@@ -260,31 +275,42 @@ struct MenuPanelView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            if store.menuBarDisplayMode == .bars {
+            // Without a session limit (Max plans) the user picks which weekly
+            // limit leads in every style; the bar graph adds its own options.
+            if !store.hasSessionLimit || store.menuBarDisplayMode == .bars {
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        barsOptionToggle("Weekly bar", isOn: $store.menuBarShowsWeekBar)
-                        // Without a session limit the second bar always shows
-                        // the per-model week, so there is nothing to choose.
-                        if store.menuBarShowsWeekBar, store.hasSessionLimit {
-                            Picker("Weekly bar source", selection: $store.menuBarWeekBarSource) {
-                                Text("All models").tag(MenuBarWeekBarSource.allModels)
-                                Text(store.weekModelName).tag(MenuBarWeekBarSource.perModel)
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                            .controlSize(.mini)
-                            .fixedSize()
-                            .accessibilityLabel("Weekly bar source")
-                            .help("Which weekly limit the second bar tracks")
+                    if !store.hasSessionLimit {
+                        HStack(spacing: 6) {
+                            Text("Main limit")
+                                .font(.caption)
+                            weekLimitPicker("Main limit", selection: $store.menuBarMainWeekLimit,
+                                            help: "Which weekly limit the menu bar shows first")
                         }
                     }
-                    barsOptionToggle("Percentages", isOn: $store.menuBarShowsPercent)
-                    barsOptionToggle("Vertical bars", isOn: $store.menuBarBarsVertical)
-                    if !store.menuBarBarsVertical {
-                        // Width only applies to horizontal bars — a vertical
-                        // bar's length is the menu-bar height.
-                        barsOptionToggle("Half-width bars", isOn: $store.menuBarBarsHalfWidth)
+                    if store.menuBarDisplayMode == .bars {
+                        if store.hasSessionLimit {
+                            HStack(spacing: 6) {
+                                barsOptionToggle("Weekly bar", isOn: $store.menuBarShowsWeekBar)
+                                if store.menuBarShowsWeekBar {
+                                    weekLimitPicker("Weekly bar source", selection: $store.menuBarWeekBarSource,
+                                                    help: "Which weekly limit the second bar tracks")
+                                }
+                            }
+                        } else {
+                            HStack(spacing: 6) {
+                                barsOptionToggle("Second bar", isOn: $store.menuBarShowsSecondWeekBar)
+                                Text(store.secondWeekLimitName)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        barsOptionToggle("Percentages", isOn: $store.menuBarShowsPercent)
+                        barsOptionToggle("Vertical bars", isOn: $store.menuBarBarsVertical)
+                        if !store.menuBarBarsVertical {
+                            // Width only applies to horizontal bars — a vertical
+                            // bar's length is the menu-bar height.
+                            barsOptionToggle("Half-width bars", isOn: $store.menuBarBarsHalfWidth)
+                        }
                     }
                 }
                 .padding(.leading, 22)

@@ -11,8 +11,10 @@ struct UsageStorePrimingTests {
 
     // MARK: - Helpers
 
-    /// A per-test cache directory, removed when the test's suite instance goes.
+    /// A per-test cache directory and settings suite, removed when the
+    /// test's suite instance goes.
     private let directory: TemporaryDirectory
+    private let settings = TestDefaults()
 
     init() throws {
         directory = try TemporaryDirectory(prefix: "claudemon-store-tests")
@@ -20,6 +22,11 @@ struct UsageStorePrimingTests {
 
     private func makeCache() -> SharedUsageCache {
         SharedUsageCache(baseDirectory: directory.url)
+    }
+
+    /// A store on this test's cache and clean settings.
+    private func makeStore(_ cache: SharedUsageCache) -> UsageStore {
+        UsageStore(cache: cache, defaults: settings.defaults)
     }
 
     private func sampleReport() -> UsageReport {
@@ -45,7 +52,7 @@ struct UsageStorePrimingTests {
         let report = sampleReport()
         cache.write(CachedUsage(report: report, state: .ok, errorMessage: nil, writtenAt: writtenAt))
 
-        let store = UsageStore(cache: cache)
+        let store = makeStore(cache)
         // Sanity: nothing seeded yet.
         #expect(store.lastGoodReport == nil)
         #expect(store.state == .loading)
@@ -85,7 +92,7 @@ struct UsageStorePrimingTests {
         cache.write(CachedUsage(report: report, state: .stale,
                                 errorMessage: "Couldn't read usage", writtenAt: now))
 
-        let store = UsageStore(cache: cache)
+        let store = makeStore(cache)
         store.primeFromCache()
 
         #expect(store.lastUpdated == oldCapture,
@@ -98,7 +105,7 @@ struct UsageStorePrimingTests {
 
     /// With no cache present, priming is a no-op and the store stays loading.
     @Test func `Priming is a no-op when the cache is empty`() {
-        let store = UsageStore(cache: makeCache()) // nothing written
+        let store = makeStore(makeCache()) // nothing written
 
         store.primeFromCache()
 
@@ -114,38 +121,93 @@ struct UsageStorePrimingTests {
         let cache = makeCache()
         cache.write(CachedUsage(report: sampleReport(), state: .ok, errorMessage: nil, writtenAt: Date()))
 
-        let store = UsageStore(cache: cache)
+        let store = makeStore(cache)
         store.primeFromCache()
 
         // The stale-render branch keeps last-good iff lastGoodReport != nil.
         #expect(store.lastGoodReport != nil, "Primed last-good guards against a drop to .loading")
     }
 
-    /// Accounts without a session limit (Max plans) get no session line from
-    /// the CLI. The all-models week must take over the menu bar, and the
-    /// second bar must then show the per-model week, not the same limit again.
-    @Test func `Without a session limit the all-models week is primary`() {
-        let weekAll = UsageMetric(
-            kind: .weekAll, rawLabel: "Current week (all models)", percent: 31,
-            resetDate: makeDate(2026, 11, 19, 8, 59), timezoneIdentifier: "Europe/Istanbul"
-        )
-        let weekModel = UsageMetric(
-            kind: .weekModel, rawLabel: "Current week (Fable)", percent: 53,
-            resetDate: makeDate(2026, 11, 19, 8, 59), timezoneIdentifier: "Europe/Istanbul"
-        )
-        let report = UsageReport(metrics: [weekAll, weekModel], capturedAt: makeDate(2026, 11, 18, 10, 0))
+    // MARK: - Menu bar limits
+
+    /// A store primed with a report holding the given limits (31% all models,
+    /// 53% Fable, and a 12% session when `withSession`).
+    private func primedStore(withSession: Bool, includesModelWeek: Bool = true) -> UsageStore {
+        func metric(_ kind: UsageMetric.Kind, _ label: String, _ percent: Int) -> UsageMetric {
+            UsageMetric(kind: kind, rawLabel: label, percent: percent,
+                        resetDate: makeDate(2026, 11, 19, 8, 59), timezoneIdentifier: "Europe/Istanbul")
+        }
+        var metrics = [metric(.weekAll, "Current week (all models)", 31)]
+        if withSession { metrics.insert(metric(.session, "Current session", 12), at: 0) }
+        if includesModelWeek { metrics.append(metric(.weekModel, "Current week (Fable)", 53)) }
+        let report = UsageReport(metrics: metrics, capturedAt: makeDate(2026, 11, 18, 10, 0))
         let cache = makeCache()
         cache.write(CachedUsage(report: report, state: .ok, errorMessage: nil, writtenAt: report.capturedAt))
-
-        let store = UsageStore(cache: cache)
-        #expect(store.primaryMetric == nil, "No data yet: no primary limit")
-        #expect(store.hasSessionLimit, "Assume a session limit until a report says otherwise")
+        let store = makeStore(cache)
         store.primeFromCache()
+        return store
+    }
+
+    /// With a session limit the session leads, and the second bar follows the
+    /// "Weekly bar" checkbox and its source picker (off by default).
+    @Test func `Session accounts: session first, weekly bar opt-in`() {
+        let store = primedStore(withSession: true)
+        #expect(store.hasSessionLimit)
+        #expect(store.menuBarPrimaryMetric?.kind == .session)
+        #expect(store.menuBarSecondMetric == nil, "The weekly bar is off by default")
+
+        store.menuBarShowsWeekBar = true
+        #expect(store.menuBarSecondMetric?.kind == .weekAll)
+        store.menuBarWeekBarSource = .perModel
+        #expect(store.menuBarSecondMetric?.kind == .weekModel)
+
+        // The Max-only choices must not affect a session account.
+        store.menuBarMainWeekLimit = .perModel
+        #expect(store.menuBarPrimaryMetric?.kind == .session)
+    }
+
+    /// Accounts without a session limit (Max plans) get no session line from
+    /// the CLI. By default the all-models week leads and the Fable week shows
+    /// as the second bar; the user can swap them or hide the second bar.
+    @Test func `No session limit: main weekly limit and second bar`() {
+        let empty = makeStore(makeCache())
+        #expect(empty.menuBarPrimaryMetric == nil, "No data yet: no primary limit")
+        #expect(empty.hasSessionLimit, "Assume a session limit until a report says otherwise")
+
+        let store = primedStore(withSession: false)
         #expect(!store.hasSessionLimit)
-        #expect(store.primaryMetric?.kind == .weekAll)
-        #expect(store.primaryMetric?.percent == 31)
-        store.menuBarWeekBarSource = .allModels
-        #expect(store.menuBarWeekMetric?.kind == .weekModel,
-                "The second bar must not repeat the all-models week")
+        #expect(store.menuBarPrimaryMetric?.kind == .weekAll)
+        #expect(store.menuBarPrimaryMetric?.percent == 31)
+        #expect(store.menuBarSecondMetric?.kind == .weekModel, "The second bar is on by default")
+        #expect(store.secondWeekLimitName == "Fable")
+
+        store.menuBarMainWeekLimit = .perModel
+        #expect(store.menuBarPrimaryMetric?.kind == .weekModel)
+        #expect(store.menuBarSecondMetric?.kind == .weekAll)
+        #expect(store.secondWeekLimitName == "All models")
+
+        store.menuBarShowsSecondWeekBar = false
+        #expect(store.menuBarSecondMetric == nil)
+        #expect(store.menuBarPrimaryMetric?.kind == .weekModel, "Hiding the second bar keeps the main one")
+    }
+
+    /// A chosen main limit missing from the report falls back to the report's
+    /// primary instead of leaving the menu bar empty.
+    @Test func `Main limit falls back when the chosen limit is missing`() {
+        let store = primedStore(withSession: false, includesModelWeek: false)
+        store.menuBarMainWeekLimit = .perModel
+        #expect(store.menuBarPrimaryMetric?.kind == .weekAll)
+        #expect(store.menuBarSecondMetric == nil, "No other weekly limit to show")
+    }
+
+    /// The new choices persist in the injected defaults across store instances.
+    @Test func `No-session menu bar choices persist`() {
+        let store = makeStore(makeCache())
+        store.menuBarMainWeekLimit = .perModel
+        store.menuBarShowsSecondWeekBar = false
+
+        let reloaded = makeStore(makeCache())
+        #expect(reloaded.menuBarMainWeekLimit == .perModel)
+        #expect(!reloaded.menuBarShowsSecondWeekBar)
     }
 }
