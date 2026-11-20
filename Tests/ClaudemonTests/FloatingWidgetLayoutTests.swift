@@ -37,4 +37,11 @@ struct FloatingWidgetLayoutTests {
         #expect(FloatingWidgetView.slimMetrics(single).map(\.kind) == [.weekAll])
         #expect(FloatingWidgetView.slimMetrics(nil).isEmpty)
     }
+
+    @Test func `Slim onboarding copy fits the slim panel`() {
+        #expect(FloatingWidgetView.slimOnboardingText(notInstalled: true)
+                == ("Claude Code isn't installed", "Install the CLI to start."))
+        #expect(FloatingWidgetView.slimOnboardingText(notInstalled: false)
+                == ("Sign in to Claude Code", "Run claude, then /login."))
+    }
 }

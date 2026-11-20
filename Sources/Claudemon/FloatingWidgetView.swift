@@ -131,16 +131,24 @@ struct FloatingWidgetView: View {
             Image(systemName: store.isNotInstalled ? "shippingbox" : "person.crop.circle.badge.exclamationmark")
                 .font(.system(size: 16))
                 .foregroundStyle(.secondary)
+            let text = Self.slimOnboardingText(notInstalled: store.isNotInstalled)
             VStack(alignment: .leading, spacing: 2) {
-                Text(store.isNotInstalled ? "Claude Code isn't installed" : "Sign in to Claude Code")
+                Text(text.title)
                     .font(.system(size: 11, weight: .semibold))
-                Text(store.isNotInstalled ? "Install the CLI, then Claudemon picks it up." : "Run claude, then /login.")
+                Text(text.detail)
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
             }
             .lineLimit(1)
+            .minimumScaleFactor(0.85)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    static func slimOnboardingText(notInstalled: Bool) -> (title: String, detail: String) {
+        notInstalled
+            ? ("Claude Code isn't installed", "Install the CLI to start.")
+            : ("Sign in to Claude Code", "Run claude, then /login.")
     }
 
     // MARK: - Mini form
