@@ -43,19 +43,18 @@ final class UsageStore {
     /// Callback fired when the floating toggle changes (wired by the app).
     @ObservationIgnored var floatingChange: ((Bool) -> Void)?
 
-    /// Whether the floating widget shows the compact (mini) form rather than the
-    /// full form. Persisted in UserDefaults and toggled by a double-click on the
-    /// panel.
-    var floatingCompact: Bool {
+    /// Which form the floating widget shows. Persisted in UserDefaults, cycled
+    /// by a double-click on the panel and chosen in the settings.
+    var floatingForm: FloatingForm {
         didSet {
-            defaults.set(floatingCompact, forKey: Self.floatingCompactKey)
-            floatingCompactChange?(floatingCompact)
+            defaults.set(floatingForm.rawValue, forKey: Self.floatingFormKey)
+            floatingFormChange?(floatingForm)
         }
     }
 
-    /// Callback fired when the compact form toggles (wired by the panel
-    /// controller so it can resize the panel).
-    @ObservationIgnored var floatingCompactChange: ((Bool) -> Void)?
+    /// Callback fired when the form changes (wired by the panel controller so
+    /// it can resize the panel).
+    @ObservationIgnored var floatingFormChange: ((FloatingForm) -> Void)?
 
     /// How the menu-bar label presents the session percent. Persisted as the
     /// case's rawValue. Defaults to `.bars`.
@@ -147,7 +146,8 @@ final class UsageStore {
     }
 
     static let floatingDefaultsKey = "floatingWidgetEnabled"
-    static let floatingCompactKey = "floatingWidgetCompact"
+    static let floatingFormKey = "floatingWidgetForm"
+    static let legacyFloatingCompactKey = "floatingWidgetCompact"
     static let menuBarDisplayModeKey = "menuBarDisplayMode"
     static let menuBarShowsWeekBarKey = "menuBarShowsWeekBar"
     static let menuBarWeekBarSourceKey = "menuBarWeekBarSource"
@@ -204,7 +204,9 @@ final class UsageStore {
         self.cache = cache
         self.defaults = defaults
         self.floatingEnabled = defaults.bool(forKey: Self.floatingDefaultsKey)
-        self.floatingCompact = defaults.bool(forKey: Self.floatingCompactKey)
+        let storedForm = defaults.string(forKey: Self.floatingFormKey)
+        self.floatingForm = storedForm.flatMap(FloatingForm.init(rawValue:))
+            ?? FloatingForm(legacyCompact: defaults.bool(forKey: Self.legacyFloatingCompactKey))
         let storedMode = defaults.string(forKey: Self.menuBarDisplayModeKey)
         self.menuBarDisplayMode = storedMode.flatMap(MenuBarDisplayMode.init(rawValue:)) ?? .bars
         self.menuBarShowsWeekBar = defaults.bool(forKey: Self.menuBarShowsWeekBarKey)

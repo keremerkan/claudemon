@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ClaudemonCore
 
 /// Manages a borderless, always-on-top, non-activating NSPanel hosting the
 /// compact SwiftUI widget. The panel is draggable by its background and does
@@ -13,9 +14,9 @@ final class FloatingPanelController {
 
     init(store: UsageStore) {
         self.store = store
-        // Resize the panel whenever the form (large <-> mini) toggles.
-        store.floatingCompactChange = { [weak self] compact in
-            self?.setCompact(compact)
+        // Resize the panel whenever the form changes.
+        store.floatingFormChange = { [weak self] form in
+            self?.setForm(form)
         }
     }
 
@@ -41,8 +42,8 @@ final class FloatingPanelController {
     }
 
     private func makePanel() -> NSPanel {
-        let compact = store.floatingCompact
-        let contentSize = Self.contentSize(compact: compact)
+        let form = store.floatingForm
+        let contentSize = Self.contentSize(for: form)
 
         let panel = NSPanel(
             contentRect: NSRect(origin: .zero, size: contentSize),
@@ -80,7 +81,7 @@ final class FloatingPanelController {
         // The autosave may have stored the OTHER form's size; reconcile the
         // restored frame's size with the persisted form, keeping the top-left
         // corner stable.
-        reconcileSize(panel, compact: compact)
+        reconcileSize(panel, form: form)
         if panel.frame.origin == .zero {
             positionDefault(panel)
         }
@@ -89,38 +90,38 @@ final class FloatingPanelController {
     }
 
     @objc private func handleDoubleClick() {
-        // Toggling drives both the SwiftUI re-render (@Observable) and, via the
+        // Advancing drives both the SwiftUI re-render (@Observable) and, via the
         // store's change callback, this controller's panel resize.
-        store.floatingCompact.toggle()
+        store.floatingForm = store.floatingForm.next
     }
 
     /// Resize the panel to fit the given form, keeping the top-left corner stable
     /// and clamping to the current screen so it never jumps off-screen.
-    private func setCompact(_ compact: Bool) {
+    private func setForm(_ form: FloatingForm) {
         guard let panel else { return }
-        let frame = Self.clamp(Self.frame(of: panel, compact: compact),
+        let frame = Self.clamp(Self.frame(of: panel, form: form),
                                to: panel.screen ?? NSScreen.main)
         panel.setFrame(frame, display: true, animate: true)
     }
 
     /// Force a restored panel's size to match the persisted form without moving
     /// its top-left corner.
-    private func reconcileSize(_ panel: NSPanel, compact: Bool) {
-        let frame = Self.frame(of: panel, compact: compact)
+    private func reconcileSize(_ panel: NSPanel, form: FloatingForm) {
+        let frame = Self.frame(of: panel, form: form)
         guard frame.size != panel.frame.size else { return }
         panel.setFrame(frame, display: false)
     }
 
     /// The panel's frame resized to the given form with its top-left corner
     /// held in place (macOS origin is bottom-left, so the top edge is maxY).
-    private static func frame(of panel: NSPanel, compact: Bool) -> NSRect {
-        let size = contentSize(compact: compact)
+    private static func frame(of panel: NSPanel, form: FloatingForm) -> NSRect {
+        let size = contentSize(for: form)
         return NSRect(x: panel.frame.minX, y: panel.frame.maxY - size.height,
                       width: size.width, height: size.height)
     }
 
-    private static func contentSize(compact: Bool) -> NSSize {
-        let size = compact ? FloatingWidgetView.miniContentSize : FloatingWidgetView.largeContentSize
+    private static func contentSize(for form: FloatingForm) -> NSSize {
+        let size = FloatingWidgetView.contentSize(for: form)
         return NSSize(width: size.width, height: size.height)
     }
 

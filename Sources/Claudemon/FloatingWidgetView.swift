@@ -14,6 +14,13 @@ struct FloatingWidgetView: View {
     static let largeContentSize = CGSize(width: 210, height: 112)
     static let miniContentSize = CGSize(width: 88, height: 88)
 
+    static func contentSize(for form: FloatingForm) -> CGSize {
+        switch form {
+        case .rings, .slim: return largeContentSize
+        case .mini: return miniContentSize
+        }
+    }
+
     let store: UsageStore
 
     private var showOnboarding: Bool {
@@ -22,7 +29,7 @@ struct FloatingWidgetView: View {
 
     /// Onboarding has nothing meaningful to show in the mini ring, so it always
     /// falls back to the large form.
-    private var isCompact: Bool { store.floatingCompact && !showOnboarding }
+    private var isCompact: Bool { store.floatingForm == .mini && !showOnboarding }
 
     var body: some View {
         Group {

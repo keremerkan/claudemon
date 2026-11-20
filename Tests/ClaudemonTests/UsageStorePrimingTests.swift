@@ -204,4 +204,23 @@ struct UsageStorePrimingTests {
         #expect(reloaded.menuBarMainWeekLimit == .perModel)
         #expect(!reloaded.menuBarShowsSecondWeekBar)
     }
+
+    @Test func `Floating form defaults to rings and persists`() {
+        let store = makeStore(makeCache())
+        #expect(store.floatingForm == .rings)
+        store.floatingForm = .slim
+
+        #expect(makeStore(makeCache()).floatingForm == .slim)
+    }
+
+    @Test func `Legacy compact setting becomes the mini form`() {
+        settings.defaults.set(true, forKey: "floatingWidgetCompact")
+        #expect(makeStore(makeCache()).floatingForm == .mini)
+    }
+
+    @Test func `Stored form wins over the legacy compact setting`() {
+        settings.defaults.set(true, forKey: "floatingWidgetCompact")
+        settings.defaults.set("slim", forKey: UsageStore.floatingFormKey)
+        #expect(makeStore(makeCache()).floatingForm == .slim)
+    }
 }
