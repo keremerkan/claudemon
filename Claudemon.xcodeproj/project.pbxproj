@@ -126,6 +126,7 @@
 			membershipExceptions = (
 				ClaudemonCore/ClaudeDiagnostics.swift,
 				ClaudemonCore/ClaudeLocator.swift,
+				ClaudemonCore/FloatingForm.swift,
 				ClaudemonCore/MenuBarMiniBar.swift,
 				ClaudemonCore/SharedUsageCache.swift,
 				ClaudemonCore/UsageAlertPolicy.swift,
