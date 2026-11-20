@@ -1,18 +1,35 @@
 import SwiftUI
 import ClaudemonCore
 
-/// Compact always-on-top widget content. Renders one of two forms:
-/// - LARGE: a ring per limit, the primary first (see `UsageReport.primary`
+/// Compact always-on-top widget content. Renders one of three forms:
+/// - RINGS: a ring per limit, the primary first (see `UsageReport.primary`
 ///          and `.secondary`), above a footer.
+/// - SLIM:  the primary limit's bar and the next one's side by side, above
+///          the same footer.
 /// - MINI:  just the primary ring (percent + "SESSION", or "WEEK" for
 ///          accounts without a session limit).
-/// Double-clicking the panel toggles between them (wired in the controller).
+/// Double-clicking the panel cycles through them (wired in the controller).
 struct FloatingWidgetView: View {
 
     /// Content sizes for each form, shared with `FloatingPanelController` so it
     /// can resize the hosting panel to match the rendered form.
     static let largeContentSize = CGSize(width: 210, height: 112)
+    static let slimContentSize = CGSize(width: 210, height: 60)
     static let miniContentSize = CGSize(width: 88, height: 88)
+
+    static func contentSize(for form: FloatingForm) -> CGSize {
+        switch form {
+        case .rings: return largeContentSize
+        case .slim: return slimContentSize
+        case .mini: return miniContentSize
+        }
+    }
+
+    /// The limits the slim form shows: the primary and the next one.
+    static func slimMetrics(_ report: UsageReport?) -> [UsageMetric] {
+        guard let report, let primary = report.primary else { return [] }
+        return [primary] + report.secondary.prefix(1)
+    }
 
     let store: UsageStore
 
@@ -22,12 +39,14 @@ struct FloatingWidgetView: View {
 
     /// Onboarding has nothing meaningful to show in the mini ring, so it always
     /// falls back to the large form.
-    private var isCompact: Bool { store.floatingCompact && !showOnboarding }
+    private var isCompact: Bool { store.floatingForm == .mini && !showOnboarding }
 
     var body: some View {
         Group {
             if isCompact {
                 miniBody
+            } else if store.floatingForm == .slim {
+                slimBody
             } else {
                 largeBody
             }
@@ -36,7 +55,7 @@ struct FloatingWidgetView: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilitySummary)
-        .accessibilityHint("Double-click to switch between the mini and full view")
+        .accessibilityHint("Double-click to switch between the rings, slim and mini views")
         .environment(\.showsRemainingUsage, store.showsRemaining)
     }
 
@@ -56,6 +75,80 @@ struct FloatingWidgetView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .panelChrome(size: Self.largeContentSize)
+    }
+
+    // MARK: - Slim form
+
+    private var slimBody: some View {
+        Group {
+            if showOnboarding {
+                slimOnboarding
+            } else {
+                VStack(spacing: 7) {
+                    slimBars
+                    footer
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .panelChrome(size: Self.slimContentSize, cornerRadius: 14)
+    }
+
+    private var slimBars: some View {
+        let metrics = Self.slimMetrics(store.lastGoodReport)
+        return HStack(spacing: 14) {
+            if metrics.isEmpty {
+                slimBar(label: UsageMetric.Kind.session.shortName, percent: nil)
+            } else {
+                ForEach(metrics, id: \.kind) { metric in
+                    slimBar(label: metric.shortLabel, percent: metric.percent)
+                }
+            }
+        }
+    }
+
+    private func slimBar(label: String, percent: Int?) -> some View {
+        VStack(spacing: 4) {
+            HStack {
+                Text(label)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 4)
+                Text(percent.map { "\(UsageDisplay.percent($0, remaining: store.showsRemaining))%" } ?? "—")
+                    .foregroundStyle(percent.map(UsageColor.color(for:)) ?? .secondary)
+                    .monospacedDigit()
+            }
+            .font(.system(size: 10, weight: .semibold))
+            .lineLimit(1)
+            UsageBar(percent: percent ?? 0, height: 5, precise: store.preciseBars)
+                .frame(height: 5)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var slimOnboarding: some View {
+        HStack(spacing: 8) {
+            Image(systemName: store.isNotInstalled ? "shippingbox" : "person.crop.circle.badge.exclamationmark")
+                .font(.system(size: 16))
+                .foregroundStyle(.secondary)
+            let text = Self.slimOnboardingText(notInstalled: store.isNotInstalled)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(text.title)
+                    .font(.system(size: 11, weight: .semibold))
+                Text(text.detail)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    static func slimOnboardingText(notInstalled: Bool) -> (title: String, detail: String) {
+        notInstalled
+            ? ("Claude Code isn't installed", "Install the CLI to start.")
+            : ("Sign in to Claude Code", "Run claude, then /login.")
     }
 
     // MARK: - Mini form
@@ -162,9 +255,9 @@ struct FloatingWidgetView: View {
 
 private extension View {
     /// The floating panel's fixed size, frosted rounded background and
-    /// hairline border, shared by the large and mini forms.
-    func panelChrome(size: CGSize) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 16)
+    /// hairline border, shared by every form.
+    func panelChrome(size: CGSize, cornerRadius: CGFloat = 16) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius)
         return frame(width: size.width, height: size.height)
             .background(.ultraThinMaterial, in: shape)
             .overlay {
