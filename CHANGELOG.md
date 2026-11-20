@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Slim view** for the floating window: the main limit's bar and the next
+  one's side by side, with the "updated · resets" footer below, at half the
+  height of the full view. Double-click now cycles full → slim → mini, and a
+  **Floating style** setting picks the form directly. If you used the mini
+  view, it stays selected.
+
 ## [1.5.0] - 2026-11-19
 
 Claudemon has a new maintainer: the repository moved to

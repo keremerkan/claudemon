@@ -10,8 +10,9 @@ and surfaces them in three places:
 
 - a compact gauge + the main limit's percentage in the **menu bar** (with a
   configurable style — icon + text, text only, or icon only),
-- an optional always-on-top **floating desktop window** with a ring per limit
-  (double-click to toggle a **mini view** of just the main limit), and
+- an optional always-on-top **floating desktop window** with a ring per limit,
+  a **slim view** with two bars, or a **mini view** of just the main limit
+  (double-click to cycle through them), and
 - **Notification Center / desktop widgets** (WidgetKit).
 
 It tracks the three limits Claude Code reports — **Current Session (5h)**,
@@ -34,15 +35,16 @@ becomes the main one: in the menu bar the one you pick as **Main limit**
 
 ## Screenshots
 
-| Menu bar panel | Floating window | Mini view |
-| :---: | :---: | :---: |
-| ![Menu bar panel](docs/menubar.png) | ![Floating desktop window](docs/floating.png) | ![Mini floating widget](docs/floating-mini.png) |
+| Menu bar panel | Floating window | Slim view | Mini view |
+| :---: | :---: | :---: | :---: |
+| ![Menu bar panel](docs/menubar.png) | ![Floating desktop window](docs/floating.png) | ![Slim floating widget](docs/floating-slim.png) | ![Mini floating widget](docs/floating-mini.png) |
 
-The floating window has two forms: the **full view** (a ring for every limit,
-the main one first, plus a reset footer) and a **mini view** that shows just
-the main limit's ring. **Double-click the floating window** to switch between
-them — the mini view is a smaller, glanceable indicator that stays out of the
-way; double-click again to return. The small desktop widget likewise shows
+The floating window has three forms: the **full view** (a ring for every
+limit, the main one first, plus a reset footer), a **slim view** (the main
+limit's bar and the next one's side by side, above the same footer, at half
+the height) and a **mini view** that shows just the main limit's ring.
+**Double-click the floating window** to cycle full → slim → mini, or pick one
+with **Floating style** in the settings. The small desktop widget likewise shows
 only the main limit's ring; the medium one lists every limit as bars, and a
 second medium widget, **Claude Usage Rings**, matches the floating window's
 full view.
@@ -87,7 +89,7 @@ The panel itself opens **clean** — usage data plus **Refresh** / **Quit** only
 **Right-click** (or control-click) the menu bar item in any style for a quick
 **Refresh** / **Quit** menu without opening the panel.
 The **⚙︎ gear** in the panel header reveals (and hides) the settings section:
-**Menu bar style**, **Floating widget**, **Precise bar fill**, **Show
+**Menu bar style**, **Floating widget** (with **Floating style**), **Precise bar fill**, **Show
 remaining**, **Launch at login**, and **Usage alerts**. Settings stay collapsed by default so the
 everyday glance is uncluttered.
 
