@@ -63,14 +63,14 @@ final class FloatingPanelController {
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
 
-        let hosting = NSHostingView(rootView: FloatingWidgetView(store: store))
+        let hosting = DraggableHostingView(rootView: FloatingWidgetView(store: store))
         hosting.frame = NSRect(origin: .zero, size: contentSize)
         hosting.autoresizingMask = [.width, .height]
         panel.contentView = hosting
 
-        // Double-click toggles between the large and mini forms. A click gesture
-        // recognizer (2 clicks) coexists with `isMovableByWindowBackground`: a
-        // drag fails the click recognizer, so dragging the panel still works.
+        // Double-click toggles between the large and mini forms. The hosting view
+        // starts the window drag itself on mouse-down (NSHostingView ignores
+        // `isMovableByWindowBackground`); the click recognizer still fires.
         let doubleClick = NSClickGestureRecognizer(target: self, action: #selector(handleDoubleClick))
         doubleClick.numberOfClicksRequired = 2
         hosting.addGestureRecognizer(doubleClick)
@@ -139,5 +139,12 @@ final class FloatingPanelController {
         let x = visible.maxX - panel.frame.width - 24
         let y = visible.maxY - panel.frame.height - 24
         panel.setFrameOrigin(NSPoint(x: x, y: y))
+    }
+}
+
+private final class DraggableHostingView<Content: View>: NSHostingView<Content> {
+    override func mouseDown(with event: NSEvent) {
+        window?.performDrag(with: event)
+        super.mouseDown(with: event)
     }
 }

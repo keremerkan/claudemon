@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- The floating window could not be dragged: the SwiftUI hosting view ignored
+  `isMovableByWindowBackground`, so the panel now starts the drag itself.
+
 ## [1.5.0] - 2026-11-19
 
 Claudemon has a new maintainer: the repository moved to
